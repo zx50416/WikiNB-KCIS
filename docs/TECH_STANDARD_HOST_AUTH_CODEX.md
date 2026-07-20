@@ -124,10 +124,12 @@ WikiNB for KCIS/
 │   ├── server.js
 │   └── lib/llm.js         # Codex／可換 provider
 ├── host/
-│   ├── start-mac.sh       # 現在：啟動 Auth
-│   ├── tunnel-mac.sh      # 現在：Cloudflare Quick Tunnel
-│   ├── start-windows.ps1  # 未來：Windows Auth
-│   └── tunnel-windows.ps1 # 未來：Windows Tunnel
+│   ├── one-command-mac.sh # 【交接首選】一鍵 Auth+Tunnel+寫入網址
+│   ├── stop-mac.sh
+│   ├── start-mac.sh
+│   ├── tunnel-mac.sh
+│   ├── start-windows.ps1
+│   └── tunnel-windows.ps1
 ├── config/sites.json      # productionUrl 單一真相（進 git）
 ├── src/scripts/auth-client.js
 └── docs/

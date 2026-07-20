@@ -1,0 +1,163 @@
+#!/usr/bin/env bash
+# 一次性：啟動 Auth + Tunnel，自動寫入 productionUrl／.env，並提示一行 push
+# 用法（整段貼到終端機即可）：
+#   cd "/path/to/WikiNB for KCIS" && ./host/one-command-mac.sh
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+PORT="${PORT:-8788}"
+LOG_DIR="$ROOT/host/.run"
+mkdir -p "$LOG_DIR"
+TUNNEL_LOG="$LOG_DIR/tunnel.log"
+AUTH_LOG="$LOG_DIR/auth.log"
+
+echo ""
+echo "=========================================="
+echo " WikiNB KCIS — 主機一鍵啟動（Mac）"
+echo " 專案：$ROOT"
+echo "=========================================="
+echo ""
+
+if [[ ! -f auth/.env ]]; then
+  echo "❌ 缺少 auth/.env"
+  echo "   先執行：cp auth/.env.example auth/.env  再填 SMTP／密鑰"
+  exit 1
+fi
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  echo "→ 尚未安裝 cloudflared，嘗試：brew install cloudflared"
+  if ! command -v brew >/dev/null 2>&1; then
+    echo "❌ 沒有 Homebrew。請先安裝：https://brew.sh"
+    exit 1
+  fi
+  brew install cloudflared
+fi
+
+auth_ok() {
+  curl -sf "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1
+}
+
+start_auth() {
+  echo "→ 啟動 Auth（背景）…"
+  # 清掉舊的同埠程序（若有）
+  if lsof -tiTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    kill $(lsof -tiTCP:"$PORT" -sTCP:LISTEN) 2>/dev/null || true
+    sleep 1
+  fi
+  (
+    cd "$ROOT"
+    export HOST=127.0.0.1
+    export FRONTEND_ORIGINS=https://zx50416.github.io
+    export COOKIE_SAMESITE=none
+    # AUTH_BASE_URL 由 .env 讀取（稍後會寫入 Tunnel 網址）
+    npm run auth
+  ) >"$AUTH_LOG" 2>&1 &
+  echo $! >"$LOG_DIR/auth.pid"
+  for i in {1..30}; do
+    if auth_ok; then
+      echo "✓ Auth 已在 http://127.0.0.1:${PORT}"
+      return 0
+    fi
+    sleep 0.5
+  done
+  echo "❌ Auth 啟動失敗，請看：$AUTH_LOG"
+  tail -n 40 "$AUTH_LOG" || true
+  exit 1
+}
+
+if auth_ok; then
+  echo "✓ Auth 已在執行"
+else
+  start_auth
+fi
+
+echo "→ 啟動 Cloudflare Tunnel（取得 HTTPS 網址）…"
+: >"$TUNNEL_LOG"
+cloudflared tunnel --url "http://127.0.0.1:${PORT}" >"$TUNNEL_LOG" 2>&1 &
+TUNNEL_PID=$!
+echo $TUNNEL_PID >"$LOG_DIR/tunnel.pid"
+
+TUNNEL_URL=""
+for i in {1..60}; do
+  TUNNEL_URL="$(grep -Eo 'https://[a-zA-Z0-9.-]+\.trycloudflare\.com' "$TUNNEL_LOG" | head -n 1 || true)"
+  if [[ -n "$TUNNEL_URL" ]]; then
+    break
+  fi
+  if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+    echo "❌ Tunnel 掛掉了，請看：$TUNNEL_LOG"
+    cat "$TUNNEL_LOG"
+    exit 1
+  fi
+  sleep 0.5
+done
+
+if [[ -z "$TUNNEL_URL" ]]; then
+  echo "❌ 等不到 Tunnel 網址，請看：$TUNNEL_LOG"
+  tail -n 50 "$TUNNEL_LOG" || true
+  exit 1
+fi
+
+echo "✓ Tunnel：$TUNNEL_URL"
+
+echo "→ 寫入 config/sites.json（productionUrl）…"
+python3 - "$ROOT/config/sites.json" "$TUNNEL_URL" <<'PY'
+import json, sys
+path, url = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as f:
+    data = json.load(f)
+data.setdefault("auth", {})["productionUrl"] = url.rstrip("/")
+with open(path, "w", encoding="utf-8") as f:
+    json.dump(data, f, ensure_ascii=False, indent=2)
+    f.write("\n")
+print("ok", path)
+PY
+
+echo "→ 寫入 auth/.env（AUTH_BASE_URL、COOKIE_SAMESITE）…"
+python3 - "$ROOT/auth/.env" "$TUNNEL_URL" <<'PY'
+import re, sys
+from pathlib import Path
+path, url = Path(sys.argv[1]), sys.argv[2].rstrip("/")
+text = path.read_text(encoding="utf-8")
+
+def upsert(text, key, value):
+    line = f"{key}={value}"
+    pat = re.compile(rf"(?m)^\s*#?\s*{re.escape(key)}=.*$")
+    if pat.search(text):
+        return pat.sub(line, text, count=1)
+    return text.rstrip() + "\n" + line + "\n"
+
+text = upsert(text, "AUTH_BASE_URL", url)
+text = upsert(text, "COOKIE_SAMESITE", "none")
+text = upsert(text, "FRONTEND_ORIGINS", "https://zx50416.github.io")
+path.write_text(text, encoding="utf-8")
+print("ok", path)
+PY
+
+echo "→ 用新設定重啟 Auth…"
+start_auth
+
+PUSH_CMD="cd \"$ROOT\" && git add config/sites.json && git commit -m \"Set Auth productionUrl for host tunnel\" && git push origin master"
+
+echo ""
+echo "=========================================="
+echo " 幾乎完成！"
+echo " Tunnel 與 Auth 已在背景跑著（此視窗可關，但關機前勿殺程序）。"
+echo ""
+echo " 【交接／上線】請再貼上下面「一整行」更新網站："
+echo ""
+echo "$PUSH_CMD"
+echo ""
+echo " 約 1 分鐘後重新整理："
+echo " https://zx50416.github.io/WikiNB-KCIS/login"
+echo "=========================================="
+echo ""
+
+if [[ "${AUTO_PUSH:-}" == "1" ]]; then
+  echo "→ AUTO_PUSH=1，自動 push…"
+  eval "$PUSH_CMD"
+fi
+
+echo "→ Tunnel 日誌持續輸出（Ctrl+C 只停顯示；程序仍在背景）。"
+echo "   停止主機：./host/stop-mac.sh"
+tail -f "$TUNNEL_LOG"

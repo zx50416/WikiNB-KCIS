@@ -7,8 +7,8 @@ dist/
 .env.*
 !.env.example
 !**/.env.example
-auth/node_modules/
-auth/.env
+host/node_modules/
+host/.run/
 # 使用者密碼庫不進 git；預核名單可進（private repo）
 auth/data/users.json
 !auth/data/roster.example.json

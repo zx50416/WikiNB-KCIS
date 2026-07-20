@@ -21,32 +21,27 @@ const base = import.meta.env.BASE_URL;
           class="mt-5 hidden rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-left text-sm leading-relaxed text-amber-950"
         ></div>
         <div id="login-local-hint" class="mt-3 hidden rounded-2xl border border-kc-blue/20 bg-white/70 p-4 text-left text-sm text-kc-blue-deep">
-          <p class="font-semibold text-kc-blue-deep">主機設定（測試用・簡短步驟）</p>
-          <p class="mt-1 text-xs text-kc-muted">線上站是 HTTPS，必須用 Tunnel 才能連你 Mac 的 Auth／Codex。</p>
-          <ol class="mt-3 list-decimal space-y-2 pl-5 text-kc-muted">
-            <li>
-              終端機 A（保持開啟）：
-              <code class="mt-0.5 block rounded bg-kc-mist px-1.5 py-0.5 text-xs">./host/start-mac.sh</code>
-            </li>
-            <li>
-              終端機 B（保持開啟；需先 <code class="rounded bg-kc-mist px-1">brew install cloudflared</code>）：
-              <code class="mt-0.5 block rounded bg-kc-mist px-1.5 py-0.5 text-xs">./host/tunnel-mac.sh</code>
-              <span class="mt-0.5 block text-xs">複製畫面中的 <code class="rounded bg-kc-mist px-1">https://….trycloudflare.com</code></span>
-            </li>
-            <li>
-              寫入同一網址：
-              <ul class="mt-1 list-disc space-y-0.5 pl-4 text-xs">
-                <li><code class="rounded bg-kc-mist px-1">config/sites.json</code> → <code class="rounded bg-kc-mist px-1">productionUrl</code></li>
-                <li><code class="rounded bg-kc-mist px-1">auth/.env</code> → <code class="rounded bg-kc-mist px-1">AUTH_BASE_URL</code> 與 <code class="rounded bg-kc-mist px-1">COOKIE_SAMESITE=none</code></li>
-              </ul>
-            </li>
-            <li>重啟終端機 A 的 Auth，再 <code class="rounded bg-kc-mist px-1">git add config/sites.json && git commit && git push</code></li>
-            <li>等約 1 分鐘後重新整理本頁測試登入</li>
-          </ol>
+          <p class="font-semibold">主機一鍵設定（交接用・複製貼上）</p>
+          <p class="mt-1 text-xs text-kc-muted">在 Mac「終端機」貼上下面<strong>整段</strong>，等它跑完即可（會自動開 Auth、Tunnel、寫入網址）。</p>
+          <pre
+            class="mt-3 overflow-x-auto rounded-xl bg-kc-blue-deep/95 p-3 text-left text-[11px] leading-relaxed text-white"
+            id="host-one-liner"
+          >cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS" && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh</pre>
+          <button
+            id="btn-copy-host-cmd"
+            type="button"
+            class="kc-btn-secondary mt-2 w-full justify-center py-2 text-sm"
+          >
+            複製指令
+          </button>
           <p class="mt-3 text-xs text-kc-muted">
+            跑完後終端機會再給你<strong>一行 push</strong>，再貼一次就會更新線上站。約 1 分鐘後重新整理本頁。
+            停止主機：<code class="rounded bg-kc-mist px-1">./host/stop-mac.sh</code>
+          </p>
+          <p class="mt-2 text-xs text-kc-muted">
             開發可先用
             <a class="font-semibold text-kc-blue underline" href="http://127.0.0.1:4321/WikiNB-KCIS/login">本機登入</a>
-            （auth + dev，不用 Tunnel）
+            （不用 Tunnel）
           </p>
         </div>
         <p id="login-error" class="mt-4 hidden text-center text-sm text-red-600" role="alert"></p>
@@ -269,6 +264,18 @@ const base = import.meta.env.BASE_URL;
         localHintEl?.classList.remove('hidden');
         panelEmail?.classList.add('hidden');
       }
+    }
+  });
+
+  document.getElementById('btn-copy-host-cmd')?.addEventListener('click', async () => {
+    const el = document.getElementById('host-one-liner');
+    const text = el?.textContent?.trim() || '';
+    const btn = document.getElementById('btn-copy-host-cmd');
+    try {
+      await navigator.clipboard.writeText(text);
+      if (btn) btn.textContent = '已複製！去終端機貼上';
+    } catch {
+      if (btn) btn.textContent = '請手動全選上方指令複製';
     }
   });
 

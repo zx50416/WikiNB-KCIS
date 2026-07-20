@@ -3,6 +3,19 @@
 > **規範（技術守則）：** [TECH_STANDARD_HOST_AUTH_CODEX.md](./TECH_STANDARD_HOST_AUTH_CODEX.md) — 架構、硬性規則、驗收標準  
 > **本文件：** 逐步操作手冊（怎麼開機、怎麼填網址）
 
+## 交接首選：終端機貼一次
+
+在 Mac 終端機**整段貼上**：
+
+```bash
+cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS" && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh
+```
+
+腳本會自動：檢查／安裝 cloudflared、開 Auth、開 Tunnel、寫入 `productionUrl` 與 `.env`。  
+結束時再給你**一行 push**，再貼一次就更新線上站。停止：`./host/stop-mac.sh`
+
+---
+
 ## 概念
 
 ```text
