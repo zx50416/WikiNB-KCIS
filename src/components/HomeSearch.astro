@@ -1,0 +1,40 @@
+---
+/**
+ * 首頁搜尋列 — WikiNB 雙鍵邏輯；文案由 data-i18n 切換（不改 MD）
+ */
+const base = import.meta.env.BASE_URL;
+---
+
+<div class="home-search w-full">
+  <form action={`${base}search`} method="get" class="w-full">
+    <div class="relative w-full">
+      <span
+        class="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-lg text-kc-blue-soft"
+        aria-hidden="true"
+      >
+        🔍
+      </span>
+      <input
+        type="search"
+        name="q"
+        placeholder="輸入老師名、科目或關鍵字，找到筆記…"
+        data-i18n-placeholder="home.placeholder"
+        class="search-input py-3 text-base sm:py-4 sm:text-lg"
+        autocomplete="off"
+      />
+    </div>
+
+    <div class="mt-4 grid grid-cols-2 gap-3">
+      <button type="submit" class="kc-btn-primary justify-center py-3 text-sm sm:text-base" data-i18n="home.search">
+        Search
+      </button>
+      <a
+        href={`${base}teachers`}
+        class="kc-btn-secondary justify-center py-3 text-sm sm:text-base"
+        data-i18n="home.teachers"
+      >
+        老師
+      </a>
+    </div>
+  </form>
+</div>

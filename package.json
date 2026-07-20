@@ -1,0 +1,23 @@
+{
+  "name": "wikinb-kcis",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "auth:install": "npm install --prefix auth",
+    "auth": "npm run start --prefix auth",
+    "auth:dev": "npm run dev --prefix auth"
+  },
+  "dependencies": {
+    "@astrojs/tailwind": "^6.0.2",
+    "@fontsource/iansui": "^5.3.0",
+    "astro": "^5.7.10",
+    "gray-matter": "^4.0.3",
+    "katex": "^0.18.1",
+    "marked": "^15.0.7",
+    "tailwindcss": "^3.4.17"
+  }
+}

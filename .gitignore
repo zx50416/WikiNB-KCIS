@@ -1,0 +1,15 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+!**/.env.example
+auth/node_modules/
+auth/.env
+# 使用者密碼庫不進 git；預核名單可進（private repo）
+auth/data/users.json
+!auth/data/roster.example.json
+!auth/data/roster.json

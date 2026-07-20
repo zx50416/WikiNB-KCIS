@@ -1,0 +1,322 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import '@fontsource/iansui/chinese-traditional-400.css';
+import '@fontsource/iansui/latin-400.css';
+import '../styles/codex.css';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Codex" description="WikiNB KCIS 複習助理">
+  <div class="animate-fadeIn codex-page">
+    <div class="mb-4 flex flex-wrap items-end justify-between gap-2 sm:gap-4">
+      <div class="min-w-0">
+        <h1 class="codex-page-title text-2xl font-bold text-kc-blue-deep sm:text-3xl md:text-4xl">
+          <span class="bg-gradient-to-r from-zinc-700 to-zinc-900 bg-clip-text text-transparent">Codex</span>
+          <span class="ml-1 text-base font-normal text-kc-purple sm:ml-2 sm:text-lg">× KCIS</span>
+        </h1>
+      </div>
+      <a href={base} class="kc-btn-ghost shrink-0 text-sm">← 首頁</a>
+    </div>
+
+    <div id="codex-gate" class="kc-card hidden p-8 text-center">
+      <p class="text-kc-muted">
+        請先 <a href={`${base}login`} class="font-semibold text-kc-blue">登入</a> 後使用 Codex。
+      </p>
+    </div>
+
+    <div id="codex-offline" class="kc-card hidden border border-amber-200 bg-amber-50/50 p-6 text-center text-amber-900">
+      API 未連線。請執行 <code class="rounded bg-white/80 px-1">npm run auth</code>（需本機 Codex CLI）。
+    </div>
+
+    <div id="codex-terminal" class="codex-terminal hidden">
+      <div class="codex-toolbar">
+        <label class="codex-field">
+          <span>模型 /model</span>
+          <select id="codex-model" class="codex-select"></select>
+        </label>
+        <label class="codex-field">
+          <span>推理强度</span>
+          <select id="codex-effort" class="codex-select"></select>
+        </label>
+      </div>
+
+      <div id="codex-tips" class="codex-tips"></div>
+
+      <div id="codex-output" class="codex-output"></div>
+      <form id="codex-form" class="codex-input-row">
+        <span class="codex-prompt">›</span>
+        <input
+          id="codex-input"
+          type="text"
+          class="codex-input"
+          placeholder="問你的 wiki 筆記…"
+          autocomplete="off"
+        />
+        <button id="codex-stop" type="button" class="codex-stop" disabled>停止</button>
+        <button id="codex-send" type="submit" class="codex-send">送出</button>
+      </form>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { marked } from 'marked';
+  import {
+    checkAuthHealth,
+    fetchMe,
+    codexChatStream,
+    fetchCodexModels,
+    stopCodex,
+  } from '../scripts/auth-client.js';
+
+  marked.setOptions({ breaks: true, gfm: true });
+
+  const gate = document.getElementById('codex-gate');
+  const offline = document.getElementById('codex-offline');
+  const terminal = document.getElementById('codex-terminal');
+  const output = document.getElementById('codex-output');
+  const form = document.getElementById('codex-form');
+  const input = document.getElementById('codex-input');
+  const sendBtn = document.getElementById('codex-send');
+  const stopBtn = document.getElementById('codex-stop');
+  const modelSelect = document.getElementById('codex-model');
+  const effortSelect = document.getElementById('codex-effort');
+  const tipsEl = document.getElementById('codex-tips');
+
+  let abortController = null;
+  let running = false;
+  /** @type {{ role: string, content: string }[]} */
+  let chatHistory = [];
+
+  function setBubbleText(bubble, text, role = 'assistant') {
+    if (!bubble) return;
+    if (role === 'assistant') {
+      bubble.classList.add('codex-md');
+      bubble.innerHTML = marked.parse(String(text ?? ''), { async: false });
+    } else {
+      bubble.classList.remove('codex-md');
+      bubble.textContent = text;
+    }
+  }
+
+  function appendLine(text, role = 'assistant') {
+    const line = document.createElement('div');
+    line.className = `codex-line codex-line-${role}`;
+    const bubble = document.createElement('div');
+    bubble.className = 'codex-bubble';
+    setBubbleText(bubble, text, role);
+    line.appendChild(bubble);
+    output?.appendChild(line);
+    output?.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
+    return line;
+  }
+
+  function startElapsedTimer() {
+    const startedAt = Date.now();
+    const line = appendLine('0s', 'system');
+    const bubble = line.querySelector('.codex-bubble');
+    const id = setInterval(() => {
+      const sec = Math.floor((Date.now() - startedAt) / 1000);
+      if (bubble) bubble.textContent = `${sec}s`;
+    }, 1000);
+    return {
+      stop() {
+        clearInterval(id);
+        const sec = Math.floor((Date.now() - startedAt) / 1000);
+        if (bubble) bubble.textContent = `總執行時間：${sec}s`;
+        return sec;
+      },
+    };
+  }
+
+  function formatElapsed(ms) {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const rem = s % 60;
+    return m > 0 ? `${m}分${String(rem).padStart(2, '0')}秒` : `${rem} 秒`;
+  }
+
+  function setRunning(isRunning) {
+    running = isRunning;
+    if (sendBtn) sendBtn.disabled = isRunning;
+    if (stopBtn) {
+      stopBtn.disabled = !isRunning;
+      stopBtn.textContent = '停止';
+    }
+    input?.toggleAttribute('disabled', isRunning);
+    modelSelect?.toggleAttribute('disabled', isRunning);
+    effortSelect?.toggleAttribute('disabled', isRunning);
+  }
+
+  async function loadModels() {
+    try {
+      const data = await fetchCodexModels();
+      modelSelect.innerHTML = '';
+      for (const m of data.models || []) {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.label || m.id;
+        if (m.id === data.defaultModel) opt.selected = true;
+        modelSelect.appendChild(opt);
+      }
+      effortSelect.innerHTML = '';
+      for (const e of data.efforts || []) {
+        const opt = document.createElement('option');
+        opt.value = e.id;
+        opt.textContent = e.label || e.id;
+        if (e.id === data.defaultEffort) opt.selected = true;
+        effortSelect.appendChild(opt);
+      }
+      if (tipsEl) {
+        tipsEl.textContent =
+          (data.tips && data.tips[0]) ||
+          '簡單 wiki 問答通常只需 15–60 秒；可問「陳老師的數學」或「全部課程」。';
+      }
+    } catch (err) {
+      appendLine(err.message || '無法載入模型', 'error');
+    }
+  }
+
+  async function init() {
+    const me = await fetchMe().catch(() => ({ authenticated: false }));
+    if (!me.authenticated) {
+      gate?.classList.remove('hidden');
+      return;
+    }
+    const health = await checkAuthHealth();
+    if (!health.online) {
+      offline?.classList.remove('hidden');
+      return;
+    }
+    terminal?.classList.remove('hidden');
+    await loadModels();
+    appendLine('Codex 已連線。可選擇模型後送出；執行中可按停止。', 'system');
+    input?.focus();
+  }
+
+  stopBtn?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    if (!running) return;
+    stopBtn.disabled = true;
+    stopBtn.textContent = '停止中…';
+    try {
+      await stopCodex();
+    } catch {
+      /* ignore */
+    }
+    abortController?.abort();
+  });
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (running) return;
+    const msg = input?.value?.trim();
+    if (!msg) return;
+
+    const model = modelSelect?.value || '';
+    const reasoningEffort = effortSelect?.value || 'medium';
+    const modelLabel = modelSelect?.selectedOptions?.[0]?.textContent || model;
+
+    appendLine(msg, 'user');
+    appendLine(`使用模型：${modelLabel} · 推理：${reasoningEffort}`, 'system');
+    input.value = '';
+
+    abortController = new AbortController();
+    setRunning(true);
+    const timer = startElapsedTimer();
+
+    const progress = document.createElement('div');
+    progress.className = 'codex-line codex-line-system';
+    const progressBubble = document.createElement('div');
+    progressBubble.className = 'codex-bubble';
+    progressBubble.textContent = '啟動中…';
+    progress.appendChild(progressBubble);
+    output?.appendChild(progress);
+
+    const liveWrap = document.createElement('div');
+    liveWrap.className = 'codex-line codex-line-live';
+    const liveBubble = document.createElement('div');
+    liveBubble.className = 'codex-bubble';
+    const liveLabel = document.createElement('div');
+    liveLabel.className = 'codex-live-label';
+    liveLabel.textContent = '即時輸出';
+    const liveBody = document.createElement('pre');
+    liveBody.className = 'codex-live-body';
+    liveBubble.appendChild(liveLabel);
+    liveBubble.appendChild(liveBody);
+    liveWrap.appendChild(liveBubble);
+    output?.appendChild(liveWrap);
+
+    let liveText = '';
+    let lastSummary = '啟動中';
+    const updateProgress = (summary) => {
+      if (summary) lastSummary = summary;
+      progressBubble.textContent = lastSummary;
+      output?.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
+    };
+
+    try {
+      const result = await codexChatStream(
+        msg,
+        (ev) => {
+          if (ev.type === 'status') updateProgress(ev.message || lastSummary);
+          else if (ev.type === 'event') updateProgress(ev.summary || ev.eventType || '處理中');
+          else if (ev.type === 'delta' && ev.text) {
+            liveText += (liveText ? '\n' : '') + ev.text;
+            liveBody.textContent = liveText;
+            output?.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
+          } else if (ev.type === 'log' && ev.text) {
+            liveText += (liveText ? '\n' : '') + ev.text;
+            liveBody.textContent = liveText;
+          }
+        },
+        {
+          model,
+          reasoningEffort,
+          signal: abortController.signal,
+          history: chatHistory.slice(-16),
+        },
+      );
+
+      timer.stop();
+      progress.remove();
+      const finalText = result.answer || liveText || '（無回應）';
+      chatHistory.push({ role: 'user', content: msg });
+      if (!result.stopped) chatHistory.push({ role: 'assistant', content: finalText });
+      if (chatHistory.length > 24) chatHistory = chatHistory.slice(-24);
+
+      liveWrap.className = `codex-line ${result.stopped ? 'codex-line-system' : 'codex-line-assistant'}`;
+      const finalBubble = document.createElement('div');
+      finalBubble.className = 'codex-bubble';
+      setBubbleText(finalBubble, finalText, result.stopped ? 'system' : 'assistant');
+      liveWrap.replaceChildren(finalBubble);
+
+      if (!result.stopped && result.fullLog?.trim() && result.fullLog.trim() !== finalText.trim()) {
+        const details = document.createElement('details');
+        details.className = 'codex-details';
+        const summary = document.createElement('summary');
+        summary.textContent = `完整 Codex 日誌 · ${formatElapsed(result.elapsedMs || 0)} · ${result.model || model}`;
+        const pre = document.createElement('pre');
+        pre.className = 'codex-live-body';
+        pre.textContent = result.fullLog;
+        details.appendChild(summary);
+        details.appendChild(pre);
+        liveWrap.after(details);
+      }
+    } catch (err) {
+      timer.stop();
+      progress.remove();
+      liveWrap.remove();
+      if (err?.name !== 'AbortError') appendLine(err.message || '執行失敗', 'error');
+      else appendLine('（已停止）', 'system');
+    } finally {
+      setRunning(false);
+      abortController = null;
+      input?.removeAttribute('disabled');
+      input?.focus();
+    }
+  });
+
+  init();
+</script>

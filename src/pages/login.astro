@@ -1,0 +1,421 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="登入" description="預核名單帳號登入 WikiNB KCIS">
+  <div class="animate-fadeIn mx-auto max-w-md">
+    <div class="kc-hero relative overflow-hidden rounded-[1.75rem] border px-6 py-10 sm:px-8">
+      <div class="kc-hero-glow" aria-hidden="true"></div>
+      <div class="relative z-[1]">
+        <h1 class="text-center font-display text-3xl font-bold text-kc-blue-deep" data-i18n="login.title">
+          登入
+        </h1>
+        <p class="mt-2 text-center text-sm text-kc-muted" data-i18n="login.subtitle">
+          先輸入 Email。在預核名單內才會繼續；首次將寄驗證碼設密碼。
+        </p>
+
+        <div id="login-offline" class="mt-5 hidden rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-950">
+          Auth 未連線。請執行 <code class="rounded bg-white/80 px-1">npm run auth</code>
+        </div>
+        <p id="login-error" class="mt-4 hidden text-center text-sm text-red-600" role="alert"></p>
+        <p id="login-ok" class="mt-4 hidden text-center text-sm text-emerald-700"></p>
+
+        <!-- 步驟 1：只有 Email -->
+        <div id="panel-email" class="mt-6 space-y-3">
+          <label class="block text-sm font-semibold text-kc-blue-deep">Email</label>
+          <input
+            id="input-email"
+            type="email"
+            class="search-input pl-5"
+            autocomplete="username"
+            placeholder="you@example.com"
+          />
+          <button id="btn-continue" type="button" class="kc-btn-primary w-full justify-center py-3" data-i18n="login.continue">
+            繼續
+          </button>
+        </div>
+
+        <!-- 步驟 2a：已設密碼 → 輸入密碼 -->
+        <div id="panel-password" class="mt-6 hidden space-y-3">
+          <p class="text-sm text-kc-muted">
+            帳號：<strong id="label-email-pw" class="text-kc-blue-deep"></strong>
+          </p>
+          <label class="block text-sm font-semibold text-kc-blue-deep">密碼</label>
+          <input
+            id="input-password"
+            type="password"
+            class="search-input pl-5"
+            autocomplete="current-password"
+            placeholder="輸入密碼"
+          />
+          <button id="btn-login" type="button" class="kc-btn-primary w-full justify-center py-3" data-i18n="login.submit">
+            登入
+          </button>
+          <button id="btn-forgot" type="button" class="kc-btn-ghost w-full justify-center" data-i18n="login.forgot">
+            忘記密碼
+          </button>
+          <button id="btn-back-from-pw" type="button" class="w-full text-center text-sm font-semibold text-kc-blue hover:text-kc-purple">
+            ← 更換 Email
+          </button>
+        </div>
+
+        <!-- 步驟 2b：首次／重設 → 先驗證碼，通過後才顯示密碼 -->
+        <div id="panel-setup" class="mt-6 hidden space-y-3">
+          <p class="text-sm text-kc-muted">
+            帳號：<strong id="label-email-setup" class="text-kc-blue-deep"></strong>
+          </p>
+          <p id="setup-hint" class="rounded-xl bg-white/60 px-3 py-2 text-sm text-kc-blue-deep"></p>
+
+          <div id="setup-code-block" class="space-y-3">
+            <label class="block text-sm font-semibold text-kc-blue-deep">驗證碼</label>
+            <input
+              id="input-code"
+              type="text"
+              inputmode="numeric"
+              maxlength="6"
+              class="search-input pl-5 text-center tracking-[0.3em]"
+              placeholder="000000"
+            />
+            <button id="btn-verify-code" type="button" class="kc-btn-primary w-full justify-center py-3" data-i18n="login.verifyCode">
+              確認驗證碼
+            </button>
+            <button id="btn-resend" type="button" class="kc-btn-ghost w-full justify-center" data-i18n="login.resend">
+              重新寄送驗證碼
+            </button>
+          </div>
+
+          <div id="setup-password-block" class="hidden space-y-3">
+            <label class="block text-sm font-semibold text-kc-blue-deep">新密碼</label>
+            <input
+              id="input-new-password"
+              type="password"
+              class="search-input pl-5"
+              autocomplete="new-password"
+              placeholder="至少 8 碼"
+            />
+            <label class="block text-sm font-semibold text-kc-blue-deep">確認新密碼</label>
+            <input
+              id="input-confirm-password"
+              type="password"
+              class="search-input pl-5"
+              autocomplete="new-password"
+              placeholder="再輸入一次"
+            />
+            <button id="btn-set-password" type="button" class="kc-btn-primary w-full justify-center py-3" data-i18n="login.setPassword">
+              設定密碼並登入
+            </button>
+          </div>
+
+          <button id="btn-back-from-setup" type="button" class="w-full text-center text-sm font-semibold text-kc-blue hover:text-kc-purple">
+            ← 更換 Email
+          </button>
+        </div>
+
+        <!-- 已登入 -->
+        <div id="panel-user" class="mt-6 hidden">
+          <div class="kc-card p-4 text-left">
+            <p id="user-name" class="font-display text-lg font-bold text-kc-blue-deep"></p>
+            <p id="user-email" class="text-sm text-kc-muted"></p>
+            <p id="user-role" class="mt-1 text-xs text-kc-muted"></p>
+          </div>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <a href={base} class="kc-btn-primary" data-i18n="login.home">回首頁</a>
+            <a href={`${base}codex`} class="kc-btn-secondary">Codex</a>
+            <button id="btn-logout" type="button" class="kc-btn-ghost" data-i18n="login.logout">登出</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import {
+    checkAuthHealth,
+    fetchMe,
+    lookupEmail,
+    loginWithPassword,
+    logout,
+    sendAuthCode,
+    setPasswordWithCode,
+    verifyAuthCode,
+  } from '../scripts/auth-client.js';
+
+  const offlineEl = document.getElementById('login-offline');
+  const errEl = document.getElementById('login-error');
+  const okEl = document.getElementById('login-ok');
+  const panelEmail = document.getElementById('panel-email');
+  const panelPassword = document.getElementById('panel-password');
+  const panelSetup = document.getElementById('panel-setup');
+  const panelUser = document.getElementById('panel-user');
+  const setupCodeBlock = document.getElementById('setup-code-block');
+  const setupPasswordBlock = document.getElementById('setup-password-block');
+
+  /** @type {'setup' | 'reset'} */
+  let setupPurpose = 'setup';
+  let currentEmail = '';
+  let verifiedCode = '';
+
+  function showErr(msg) {
+    if (!errEl) return;
+    errEl.textContent = msg || '';
+    errEl.classList.toggle('hidden', !msg);
+  }
+  function showOk(msg) {
+    if (!okEl) return;
+    okEl.textContent = msg || '';
+    okEl.classList.toggle('hidden', !msg);
+  }
+
+  function hideAllSteps() {
+    panelEmail?.classList.add('hidden');
+    panelPassword?.classList.add('hidden');
+    panelSetup?.classList.add('hidden');
+    panelUser?.classList.add('hidden');
+  }
+
+  function showEmailStep() {
+    hideAllSteps();
+    panelEmail?.classList.remove('hidden');
+    currentEmail = '';
+    verifiedCode = '';
+    setupPurpose = 'setup';
+  }
+
+  function showPasswordStep(email) {
+    hideAllSteps();
+    panelPassword?.classList.remove('hidden');
+    currentEmail = email;
+    const label = document.getElementById('label-email-pw');
+    if (label) label.textContent = email;
+    const pw = document.getElementById('input-password');
+    if (pw) pw.value = '';
+  }
+
+  function showSetupStep(email, hint, purpose = 'setup') {
+    hideAllSteps();
+    panelSetup?.classList.remove('hidden');
+    currentEmail = email;
+    setupPurpose = purpose;
+    verifiedCode = '';
+    const label = document.getElementById('label-email-setup');
+    if (label) label.textContent = email;
+    const hintEl = document.getElementById('setup-hint');
+    if (hintEl) hintEl.textContent = hint || '';
+    setupCodeBlock?.classList.remove('hidden');
+    setupPasswordBlock?.classList.add('hidden');
+    const codeInput = document.getElementById('input-code');
+    if (codeInput) {
+      codeInput.value = '';
+      codeInput.removeAttribute('readonly');
+    }
+    for (const id of ['input-new-password', 'input-confirm-password']) {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    }
+  }
+
+  function showUser(user) {
+    hideAllSteps();
+    panelUser?.classList.remove('hidden');
+    const n = document.getElementById('user-name');
+    const e = document.getElementById('user-email');
+    const r = document.getElementById('user-role');
+    if (n) n.textContent = user.name || user.email;
+    if (e) e.textContent = user.email;
+    if (r) r.textContent = `role: ${user.role}`;
+  }
+
+  checkAuthHealth().then((h) => {
+    if (!h.online) offlineEl?.classList.remove('hidden');
+  });
+
+  fetchMe()
+    .then((me) => {
+      if (me.authenticated && me.user) showUser(me.user);
+    })
+    .catch(() => {});
+
+  document.getElementById('btn-continue')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    const email = document.getElementById('input-email')?.value?.trim();
+    const btn = document.getElementById('btn-continue');
+    try {
+      if (btn) {
+        btn.setAttribute('disabled', 'true');
+        btn.textContent = '檢查中…';
+      }
+      const result = await lookupEmail(email);
+      if (result.step === 'password') {
+        showOk(result.message || '');
+        showPasswordStep(result.email);
+      } else if (result.step === 'setup') {
+        showOk(result.message || '');
+        showSetupStep(result.email, result.message, 'setup');
+      } else {
+        showErr('無法判斷登入步驟');
+      }
+    } catch (err) {
+      showErr(err.message || 'Email 無效');
+    } finally {
+      if (btn) {
+        btn.removeAttribute('disabled');
+        btn.textContent = '繼續';
+      }
+    }
+  });
+
+  document.getElementById('input-email')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-continue')?.click();
+  });
+
+  document.getElementById('btn-login')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    const password = document.getElementById('input-password')?.value || '';
+    try {
+      const result = await loginWithPassword(currentEmail, password);
+      showOk(result.message || '登入成功');
+      showUser(result.user);
+    } catch (err) {
+      showErr(err.message || '登入失敗');
+    }
+  });
+
+  document.getElementById('input-password')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-login')?.click();
+  });
+
+  document.getElementById('btn-forgot')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    try {
+      const result = await sendAuthCode(currentEmail, 'reset');
+      showOk(result.message || '驗證碼已寄出');
+      showSetupStep(
+        currentEmail,
+        result.dev
+          ? '忘記密碼：驗證碼已顯示於 Auth 終端機'
+          : '忘記密碼：驗證碼已寄至你的信箱',
+        'reset',
+      );
+    } catch (err) {
+      showErr(err.message || '無法寄送驗證碼');
+    }
+  });
+
+  document.getElementById('btn-resend')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    const btn = document.getElementById('btn-resend');
+    try {
+      if (btn) {
+        btn.setAttribute('disabled', 'true');
+        btn.textContent = '寄送中…';
+      }
+      const result = await sendAuthCode(currentEmail, setupPurpose);
+      verifiedCode = '';
+      setupPasswordBlock?.classList.add('hidden');
+      setupCodeBlock?.classList.remove('hidden');
+      const codeInput = document.getElementById('input-code');
+      if (codeInput) {
+        codeInput.value = '';
+        codeInput.removeAttribute('readonly');
+      }
+      showOk(result.message || '驗證碼已重新寄出');
+      const hintEl = document.getElementById('setup-hint');
+      if (hintEl) hintEl.textContent = result.message || '';
+    } catch (err) {
+      showErr(err.message || '寄送失敗');
+    } finally {
+      if (btn) {
+        btn.removeAttribute('disabled');
+        btn.textContent = '重新寄送驗證碼';
+      }
+    }
+  });
+
+  document.getElementById('btn-verify-code')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    const code = document.getElementById('input-code')?.value?.trim();
+    const btn = document.getElementById('btn-verify-code');
+    try {
+      if (btn) {
+        btn.setAttribute('disabled', 'true');
+        btn.textContent = '驗證中…';
+      }
+      const result = await verifyAuthCode(currentEmail, code, setupPurpose);
+      verifiedCode = code;
+      showOk(result.message || '驗證碼正確');
+      const codeInput = document.getElementById('input-code');
+      if (codeInput) codeInput.setAttribute('readonly', 'true');
+      setupPasswordBlock?.classList.remove('hidden');
+      document.getElementById('input-new-password')?.focus();
+    } catch (err) {
+      verifiedCode = '';
+      showErr(err.message || '驗證碼錯誤');
+    } finally {
+      if (btn) {
+        btn.removeAttribute('disabled');
+        btn.textContent = '確認驗證碼';
+      }
+    }
+  });
+
+  document.getElementById('input-code')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-verify-code')?.click();
+  });
+
+  document.getElementById('btn-set-password')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    const code = verifiedCode || document.getElementById('input-code')?.value?.trim();
+    const password = document.getElementById('input-new-password')?.value || '';
+    const confirm = document.getElementById('input-confirm-password')?.value || '';
+    if (!code) {
+      showErr('請先確認驗證碼');
+      return;
+    }
+    if (password.length < 8) {
+      showErr('密碼至少 8 碼');
+      return;
+    }
+    if (password !== confirm) {
+      showErr('兩次輸入的密碼不一致');
+      return;
+    }
+    try {
+      const result = await setPasswordWithCode({
+        email: currentEmail,
+        code,
+        password,
+        purpose: setupPurpose,
+      });
+      showOk(result.message || '完成');
+      showUser(result.user);
+    } catch (err) {
+      showErr(err.message || '設定失敗');
+    }
+  });
+
+  document.getElementById('btn-back-from-pw')?.addEventListener('click', () => {
+    showErr('');
+    showOk('');
+    showEmailStep();
+  });
+
+  document.getElementById('btn-back-from-setup')?.addEventListener('click', () => {
+    showErr('');
+    showOk('');
+    showEmailStep();
+  });
+
+  document.getElementById('btn-logout')?.addEventListener('click', async () => {
+    await logout();
+    window.location.href = document.documentElement.dataset.base || '/';
+  });
+</script>

@@ -1,0 +1,9 @@
+{
+  "id": "math",
+  "name": "數學",
+  "nameEn": "Math",
+  "teacherId": "demo-chen",
+  "keywords": ["陳老師", "數學"],
+  "keywordsEn": ["陳老師", "Math"],
+  "status": "active"
+}

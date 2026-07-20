@@ -1,0 +1,28 @@
+{
+  "brand": {
+    "name": "WikiNB · KCIS",
+    "shortName": "WikiNB",
+    "tagline": "康橋教學筆記庫",
+    "school": "康橋國際學校"
+  },
+  "auth": {
+    "url": "http://127.0.0.1:8788",
+    "mode": "roster+password"
+  },
+  "sites": {
+    "navigator": {
+      "name": "康橋 AI 應用導航",
+      "url": "https://zx50416.github.io/KCIS_AI_website/",
+      "role": "AI／數位工具導航（姊妹站）"
+    },
+    "wikinbKcis": {
+      "name": "WikiNB · KCIS",
+      "url": "https://zx50416.github.io/WikiNB-KCIS/",
+      "role": "教學筆記知識庫（本站）"
+    }
+  },
+  "keywordsPolicy": {
+    "fixed": ["teacher", "subject"],
+    "description": "每篇筆記固定兩個 keywords：老師名字、科目"
+  }
+}

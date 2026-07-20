@@ -1,0 +1,19 @@
+[
+  {
+    "email": "kainnne@kcis.com.tw",
+    "name": "Kaine",
+    "role": "admin",
+    "note": "測試用管理員 — 首次請走驗證碼設密碼（見 docs/SECURITY_AND_ONBOARDING.md）"
+  },
+  {
+    "email": "demo.teacher@example.com",
+    "name": "陳老師（示範）",
+    "role": "teacher",
+    "teacherId": "demo-chen"
+  },
+  {
+    "email": "demo.student@example.com",
+    "name": "示範學生",
+    "role": "student"
+  }
+]

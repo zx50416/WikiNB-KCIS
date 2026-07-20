@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getAllWikiPages, getWikiPage } from '../../lib/wiki';
+
+export function getStaticPaths() {
+  return getAllWikiPages({ includeDrafts: true }).map((page) => ({
+    params: { slug: page.slug },
+  }));
+}
+
+const { slug } = Astro.params;
+const page = getWikiPage(slug!);
+const base = import.meta.env.BASE_URL;
+
+if (!page) {
+  return Astro.redirect(`${base}404`);
+}
+
+const allPages = getAllWikiPages();
+const related = allPages
+  .filter(
+    (p) =>
+      p.slug !== page.slug &&
+      (p.teacherId === page.teacherId || p.subjectId === page.subjectId),
+  )
+  .slice(0, 3);
+---
+
+<BaseLayout title={page.title} description={page.description}>
+  <article class="animate-fadeIn">
+    <header class="mb-8">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <time class="text-sm font-semibold text-kc-purple">{page.date}</time>
+        {page.updated && (
+          <span class="text-xs text-kc-muted">
+            <span data-i18n="wiki.updated" data-i18n-date={page.updated}>更新於 {page.updated}</span>
+          </span>
+        )}
+        <span class="tag-keyword">{page.teacher}</span>
+        <span
+          class="tag-keyword"
+          data-locale-text
+          data-zh={page.subject}
+          data-en={page.subjectEn || page.subject}
+        >
+          {page.subject}
+        </span>
+        {page.tags.map((tag) => (
+          <a href={`${base}search?q=${encodeURIComponent(tag)}`} class="tag-badge hover:opacity-80">
+            {tag}
+          </a>
+        ))}
+      </div>
+      <h1 class="font-display text-3xl font-bold text-kc-blue-deep md:text-4xl">{page.title}</h1>
+      {page.description && <p class="mt-3 text-lg text-kc-muted">{page.description}</p>}
+    </header>
+
+    <!-- 筆記正文維持原文，不隨介面語言翻譯 -->
+    <div class="kc-card kc-core-card wiki-content p-6 md:p-10" set:html={page.html} />
+
+    {related.length > 0 && (
+      <section class="mt-10">
+        <h2 class="mb-4 font-display text-xl font-bold text-kc-blue-deep">
+          <span class="mr-2 text-kc-purple/70" aria-hidden="true">✦</span>
+          <span data-i18n="wiki.related">相關筆記</span>
+        </h2>
+        <div class="grid gap-3 sm:grid-cols-3">
+          {related.map((r) => (
+            <a href={`${base}wiki/${r.slug}`} class="kc-card-hover block p-4">
+              <div class="mb-2 flex flex-wrap gap-1.5">
+                <span class="tag-keyword text-[10px]">{r.teacher}</span>
+                <span
+                  class="tag-keyword text-[10px]"
+                  data-locale-text
+                  data-zh={r.subject}
+                  data-en={r.subjectEn || r.subject}
+                >
+                  {r.subject}
+                </span>
+              </div>
+              <h3 class="font-display font-bold text-kc-blue-deep">{r.title}</h3>
+              <p class="mt-1 line-clamp-2 text-sm text-kc-muted">{r.description}</p>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <div class="mt-8 flex flex-wrap gap-3">
+      <a href={`${base}search`} class="kc-btn-ghost" data-i18n="wiki.library">← 筆記庫</a>
+      <a
+        href={`${base}search?q=${encodeURIComponent(page.teacher)}`}
+        class="kc-btn-ghost"
+        data-i18n="wiki.sameTeacher"
+      >
+        同老師
+      </a>
+    </div>
+  </article>
+</BaseLayout>
+
+<script>
+  import { applyI18n, t, getLocale } from '../../scripts/i18n.js';
+
+  function patchUpdated() {
+    document.querySelectorAll('[data-i18n="wiki.updated"]').forEach((el) => {
+      const date = el.getAttribute('data-i18n-date') || '';
+      el.textContent = t('wiki.updated', { date }, getLocale());
+    });
+  }
+
+  patchUpdated();
+  document.addEventListener('wikinb:locale-change', () => {
+    applyI18n();
+    patchUpdated();
+  });
+</script>

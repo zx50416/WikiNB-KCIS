@@ -1,0 +1,9 @@
+{
+  "id": "english",
+  "name": "英文",
+  "nameEn": "English",
+  "teacherId": "demo-lin",
+  "keywords": ["林老師", "英文"],
+  "keywordsEn": ["林老師", "English"],
+  "status": "active"
+}

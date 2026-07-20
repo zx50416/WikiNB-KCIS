@@ -1,0 +1,92 @@
+---
+import sites from '../../config/sites.json';
+
+const base = import.meta.env.BASE_URL;
+const navUrl = sites.sites.navigator.url;
+---
+
+<header class="fixed inset-x-0 top-0 z-50 border-b border-white/40 bg-white/45 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-3 py-3 md:px-8">
+    <a
+      href={base}
+      class="group flex min-w-0 items-center gap-2.5 rounded-full py-1 pr-2 transition hover:bg-white/50 sm:gap-3 sm:pr-3"
+      data-i18n-aria="nav.homeTitle"
+      data-i18n-title="nav.homeTitle"
+      aria-label="回到首頁"
+      title="回到首頁"
+    >
+      <img
+        src={`${base}brand/kangchiao-logo.png`}
+        alt=""
+        class="h-7 w-auto transition-opacity group-hover:opacity-90 sm:h-8"
+        width="154"
+        height="28"
+      />
+      <span class="hidden h-5 w-px bg-[color:var(--kc-line)] sm:block" aria-hidden="true"></span>
+      <span
+        class="home-chip hidden rounded-full border border-[color:var(--kc-line)] bg-white/70 px-2.5 py-1 text-xs font-semibold text-kc-blue-deep transition group-hover:border-kc-purple/30 group-hover:bg-white sm:inline-flex"
+        data-i18n="nav.home"
+      >
+        首頁
+      </span>
+    </a>
+
+    <nav class="flex max-w-[75%] flex-wrap items-center justify-end gap-1 md:max-w-none md:gap-2">
+      <a href={`${base}search`} class="nav-wikinb" data-i18n="nav.wikinb">WikiNB</a>
+      <a
+        href={navUrl}
+        class="nav-secondary"
+        target="_blank"
+        rel="noopener noreferrer"
+        data-i18n="nav.ai"
+      >
+        AI 工具選擇
+      </a>
+      <button id="btn-lang" type="button" class="nav-lang" title="Switch to English">EN</button>
+      <a id="nav-codex" href={`${base}codex`} class="nav-link hidden">Codex</a>
+      <span id="nav-user" class="nav-user hidden max-w-[8rem] truncate text-xs font-semibold text-kc-blue-deep sm:text-sm"></span>
+      <a id="nav-login" href={`${base}login`} class="nav-link" data-i18n="nav.login">登入</a>
+      <button id="nav-logout" type="button" class="nav-link hidden" data-i18n="login.logout">登出</button>
+    </nav>
+  </div>
+</header>
+
+<script>
+  import { mountI18n } from '../scripts/i18n.js';
+  import { mountNavAuth } from '../scripts/auth-client.js';
+  mountI18n();
+  mountNavAuth();
+</script>
+
+<style>
+  .nav-link {
+    @apply rounded-full px-2.5 py-1.5 text-xs font-semibold text-kc-blue-deep transition-colors hover:bg-white/70 sm:px-3 sm:py-2 sm:text-sm md:px-4;
+  }
+
+  .nav-wikinb {
+    @apply rounded-full px-3 py-1.5 text-xs font-bold text-white transition-all hover:scale-105 sm:px-4 sm:py-2 sm:text-sm md:px-5;
+    background: linear-gradient(120deg, var(--kc-blue), var(--kc-purple));
+    box-shadow: 0 6px 18px rgba(27, 79, 156, 0.28);
+  }
+
+  .nav-secondary {
+    @apply rounded-full px-3 py-1.5 text-xs font-bold text-white transition-all hover:scale-105 sm:px-4 sm:py-2 sm:text-sm md:px-5;
+    background: linear-gradient(120deg, var(--kc-blue-soft), #3d9bb8);
+    box-shadow: 0 6px 18px rgba(61, 155, 184, 0.3);
+  }
+
+  .nav-lang {
+    @apply rounded-full border px-3.5 py-2 text-sm font-bold text-kc-blue-deep transition hover:bg-white sm:px-4 sm:py-2.5 sm:text-base;
+    border-color: var(--kc-line);
+    background: rgba(255, 255, 255, 0.75);
+    min-width: 3.25rem;
+  }
+
+  .nav-lang:hover {
+    border-color: rgba(107, 61, 154, 0.35);
+  }
+
+  .nav-user {
+    @apply rounded-full bg-white/60 px-2 py-1;
+  }
+</style>
