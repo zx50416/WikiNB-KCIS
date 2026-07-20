@@ -1,5 +1,8 @@
 # 部署主機：Auth + Codex（Mac 現在 → Windows 未來）
 
+> **規範（技術守則）：** [TECH_STANDARD_HOST_AUTH_CODEX.md](./TECH_STANDARD_HOST_AUTH_CODEX.md) — 架構、硬性規則、驗收標準  
+> **本文件：** 逐步操作手冊（怎麼開機、怎麼填網址）
+
 ## 概念
 
 ```text

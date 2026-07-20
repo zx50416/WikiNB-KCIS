@@ -6,6 +6,7 @@
 **原始碼：** https://github.com/zx50416/WikiNB-KCIS  
 
 **主機部署（Mac → 未來 Windows + Codex）：** [docs/HOST_DEPLOY.md](./docs/HOST_DEPLOY.md)  
+**技術守則（架構規範）：** [docs/TECH_STANDARD_HOST_AUTH_CODEX.md](./docs/TECH_STANDARD_HOST_AUTH_CODEX.md)  
 **需求：** [docs/REQUIREMENTS_AND_TECH.md](./docs/REQUIREMENTS_AND_TECH.md)  
 **登入：** [docs/AUTH_ROSTER_PASSWORD.md](./docs/AUTH_ROSTER_PASSWORD.md)  
 **資安 × 加人：** [docs/SECURITY_AND_ONBOARDING.md](./docs/SECURITY_AND_ONBOARDING.md)
