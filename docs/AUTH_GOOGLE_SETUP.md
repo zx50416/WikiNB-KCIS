@@ -82,7 +82,7 @@
 我會在專案裡準備好 `auth/.env.example`。請你：
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS"
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
 cp auth/.env.example auth/.env
 ```
 

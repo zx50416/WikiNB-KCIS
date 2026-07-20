@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 一次性：啟動 Auth + Tunnel，自動寫入 productionUrl／.env，並提示一行 push
 # 用法（整段貼到終端機即可）：
-#   cd "/path/to/WikiNB for KCIS" && ./host/one-command-mac.sh
+#   cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS" && ./host/one-command-mac.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

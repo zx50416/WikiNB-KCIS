@@ -92,7 +92,7 @@ export function getAuthMixedContentBlock() {
 }
 
 /** 專案在本機的預設路徑（交接／一鍵指令用） */
-export const HOST_PROJECT_DIR = '/Users/kaine/Desktop/Projects/WikiNB for KCIS';
+export const HOST_PROJECT_DIR = '/Users/kaine/Desktop/Projects/WikiNB_for_KCIS';
 
 function hostCommands() {
   const q = `"${HOST_PROJECT_DIR}"`;

@@ -37,7 +37,7 @@ GitHub Pages（靜態網站，HTTPS）
 **正確測登入／Codex：**
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS"
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
 npm run auth    # 終端機 1
 npm run dev     # 終端機 2
 ```

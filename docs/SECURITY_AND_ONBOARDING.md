@@ -1,6 +1,6 @@
 # 資安管控建議 × 老師／學生開通方式
 
-> 適用：WikiNB for KCIS（預核名單 + 驗證碼設密碼 + 帳密登入）  
+> 適用：WikiNB_for_KCIS（預核名單 + 驗證碼設密碼 + 帳密登入）  
 > 更新日期：2026-07-20
 
 ---
@@ -42,7 +42,7 @@
 1. **終端機 1 — 啟動 API**
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS"
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
 npm run auth
 ```
 
@@ -51,7 +51,7 @@ npm run auth
 2. **終端機 2 — 啟動網站**
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS"
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
 npm run dev
 ```
 

@@ -9,7 +9,7 @@
 ## 資料夾結構（本階段）
 
 ```text
-WikiNB for KCIS/
+WikiNB_for_KCIS/
 ├── auth/                      # 可獨立部署的登入／session 服務
 │   ├── .env.example           # 範本（可進 git）
 │   ├── .env                   # 密鑰（不可進 git）

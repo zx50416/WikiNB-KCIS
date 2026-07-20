@@ -118,7 +118,7 @@ COOKIE_SAMESITE=none
 ## 4. 標準目錄與腳本
 
 ```text
-WikiNB for KCIS/
+WikiNB_for_KCIS/
 ├── auth/                  # 主機上常駐的 API
 │   ├── .env               # 密鑰（gitignore）
 │   ├── server.js

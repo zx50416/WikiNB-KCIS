@@ -23,6 +23,14 @@
 
 ## 主機快速啟動（Mac）
 
+終端機整段貼上（交接首選）：
+
+```bash
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS" && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh
+```
+
+或手動：
+
 ```bash
 chmod +x host/*.sh
 ./host/start-mac.sh      # 終端機 1：Auth + Codex

@@ -8,7 +8,7 @@
 在 Mac 終端機**整段貼上**：
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS" && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS" && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh
 ```
 
 腳本會自動：檢查／安裝 cloudflared、開 Auth、開 Tunnel、寫入 `productionUrl` 與 `.env`。  
@@ -42,7 +42,7 @@ cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS" && chmod +x host/one-command-
 ### 1. 本機依賴
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS"
+cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
 npm install
 npm run auth:install
 # 確認本機已登入／可用 Codex CLI
