@@ -86,8 +86,8 @@ export function getAuthMixedContentBlock() {
     online: false,
     reason: 'mixed-content',
     message: hasProd
-      ? '主機 Auth 設定異常（仍指向 HTTP）。請檢查 config/sites.json 的 productionUrl 是否為 HTTPS Tunnel。'
-      : '線上站需連「主機」上的 Auth（HTTPS）。請在部署主機（目前 Mac，未來 Windows）執行 host 腳本並把 Tunnel 網址寫入 productionUrl 後重新部署。詳見 docs/HOST_DEPLOY.md。',
+      ? '主機 Auth 設定異常（仍指向 HTTP）。請檢查 productionUrl 是否為 HTTPS Tunnel。'
+      : '線上站還不能連主機 Auth（尚未設定 Tunnel／productionUrl）。請依下方簡短步驟設定後再測。',
   };
 }
 
