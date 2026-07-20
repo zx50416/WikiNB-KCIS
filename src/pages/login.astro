@@ -16,9 +16,7 @@ const base = import.meta.env.BASE_URL;
           先輸入 Email。在預核名單內才會繼續；首次將寄驗證碼設密碼。
         </p>
 
-        <div id="login-offline" class="mt-5 hidden rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-950">
-          Auth 未連線。請執行 <code class="rounded bg-white/80 px-1">npm run auth</code>
-        </div>
+        <div id="login-offline" class="mt-5 hidden rounded-2xl border border-amber-200 bg-amber-50/80 p-3 text-sm text-amber-950"></div>
         <p id="login-error" class="mt-4 hidden text-center text-sm text-red-600" role="alert"></p>
         <p id="login-ok" class="mt-4 hidden text-center text-sm text-emerald-700"></p>
 
@@ -229,7 +227,12 @@ const base = import.meta.env.BASE_URL;
   }
 
   checkAuthHealth().then((h) => {
-    if (!h.online) offlineEl?.classList.remove('hidden');
+    if (!h.online && offlineEl) {
+      offlineEl.innerHTML =
+        h.message ||
+        'Auth 未連線。請執行 <code class="rounded bg-white/80 px-1">npm run auth</code>';
+      offlineEl.classList.remove('hidden');
+    }
   });
 
   fetchMe()

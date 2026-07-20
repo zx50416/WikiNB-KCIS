@@ -55,7 +55,9 @@ cd "/Users/kaine/Desktop/Projects/WikiNB for KCIS"
 npm run dev
 ```
 
-開啟：http://127.0.0.1:4321/WikiNB-KCIS/login
+開啟：http://127.0.0.1:4321/WikiNB-KCIS/login  
+
+（線上站 https://zx50416.github.io/WikiNB-KCIS/ 可瀏覽筆記；**登入請用本機網址**，見 [DEPLOY_PRIVATE_PAGES.md](./DEPLOY_PRIVATE_PAGES.md)）
 
 3. **首次設定密碼**
 

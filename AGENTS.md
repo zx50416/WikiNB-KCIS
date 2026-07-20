@@ -33,7 +33,10 @@
 ```bash
 npm install
 npm run auth:install
-cp auth/.env.example auth/.env   # 填 Google 憑證
+cp auth/.env.example auth/.env   # 填 SMTP／密鑰（勿 commit）
 npm run auth                     # http://127.0.0.1:8788
 npm run dev                      # http://127.0.0.1:4321/WikiNB-KCIS/
 ```
+
+**線上站（瀏覽筆記）：** https://zx50416.github.io/WikiNB-KCIS/  
+登入／Codex 請用本機 `dev`（Pages 的 HTTPS 無法打本機 HTTP Auth）。

@@ -25,9 +25,7 @@ const base = import.meta.env.BASE_URL;
       </p>
     </div>
 
-    <div id="codex-offline" class="kc-card hidden border border-amber-200 bg-amber-50/50 p-6 text-center text-amber-900">
-      API 未連線。請執行 <code class="rounded bg-white/80 px-1">npm run auth</code>（需本機 Codex CLI）。
-    </div>
+    <div id="codex-offline" class="kc-card hidden border border-amber-200 bg-amber-50/50 p-6 text-center text-amber-900"></div>
 
     <div id="codex-terminal" class="codex-terminal hidden">
       <div class="codex-toolbar">
@@ -186,7 +184,12 @@ const base = import.meta.env.BASE_URL;
     }
     const health = await checkAuthHealth();
     if (!health.online) {
-      offline?.classList.remove('hidden');
+      if (offline) {
+        offline.textContent =
+          health.message ||
+          'API 未連線。請執行 npm run auth（需本機 Codex CLI）。';
+        offline.classList.remove('hidden');
+      }
       return;
     }
     terminal?.classList.remove('hidden');

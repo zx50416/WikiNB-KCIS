@@ -45,11 +45,33 @@ async function authFetch(path, options = {}) {
   return data;
 }
 
+export function getAuthMixedContentBlock() {
+  if (typeof location === 'undefined') return null;
+  const base = getAuthBase();
+  const pageIsHttps = location.protocol === 'https:';
+  const authIsHttp = /^http:\/\//i.test(base);
+  if (pageIsHttps && authIsHttp) {
+    return {
+      online: false,
+      reason: 'mixed-content',
+      message:
+        '你正在用 GitHub Pages（HTTPS）。瀏覽器會擋對本機 Auth（HTTP）的連線。請在本機另開：npm run auth + npm run dev，用 http://127.0.0.1:4321/WikiNB-KCIS/ 登入與 Codex。線上站仍可瀏覽筆記。',
+    };
+  }
+  return null;
+}
+
 export async function checkAuthHealth() {
+  const blocked = getAuthMixedContentBlock();
+  if (blocked) return blocked;
   try {
     return await authFetch('/api/health');
   } catch {
-    return { online: false };
+    return {
+      online: false,
+      reason: 'offline',
+      message: 'Auth 未連線。請在本機專案資料夾執行 npm run auth（預設 http://127.0.0.1:8788）。',
+    };
   }
 }
 

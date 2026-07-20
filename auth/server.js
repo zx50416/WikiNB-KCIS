@@ -60,6 +60,14 @@ app.use(
   }),
 );
 
+/** Chrome Private Network Access：公開 HTTPS 站打本機 Auth 的 preflight */
+app.use((req, res, next) => {
+  if (req.headers['access-control-request-private-network'] === 'true') {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true');
+  }
+  next();
+});
+
 async function readSession(req) {
   return verifySessionToken(req.cookies?.[getSessionCookieName()]);
 }
