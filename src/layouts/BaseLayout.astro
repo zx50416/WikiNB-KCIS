@@ -23,6 +23,10 @@ const authJson = JSON.stringify({
     import.meta.env.PUBLIC_AUTH_URL ||
     sites.auth?.url ||
     'http://127.0.0.1:8788',
+  productionUrl:
+    import.meta.env.PUBLIC_AUTH_PRODUCTION_URL ||
+    sites.auth?.productionUrl ||
+    '',
   allowedEmailDomain: sites.auth?.allowedEmailDomain || 'kcis.com.tw',
 });
 ---

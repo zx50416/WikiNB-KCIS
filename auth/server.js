@@ -27,6 +27,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 const PORT = Number(process.env.PORT || 8788);
+const HOST = process.env.HOST || '127.0.0.1';
 const PROJECT_ROOT = process.env.PROJECT_ROOT || path.resolve(__dirname, '..');
 process.env.PROJECT_ROOT = PROJECT_ROOT;
 
@@ -349,8 +350,10 @@ app.post('/api/codex/chat', requireAuth, async (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`\n🔐 WikiNB KCIS API  http://127.0.0.1:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`\n🔐 WikiNB KCIS API  http://127.0.0.1:${PORT}  (bind ${HOST})`);
+  console.log(`   Mode: host Auth + Codex（目前 Mac，可搬到 Windows）`);
+  console.log(`   AUTH_BASE_URL: ${process.env.AUTH_BASE_URL || '(unset)'}`);
   console.log(`   Auth: roster + email code + password`);
   console.log(`   Roster: ${getRosterPath()}`);
   console.log(`   LLM: ${process.env.LLM_PROVIDER || 'codex'}`);

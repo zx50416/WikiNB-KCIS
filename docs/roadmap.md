@@ -11,15 +11,15 @@
 
 ## 進行中
 
-- [ ] 本機設 SMTP（kainnne 應用程式密碼）後測真寄信
-- [ ] 本機 `npm run auth` + `npm run dev` 測登入與 Codex
+- [ ] Mac 當部署主機：cloudflared Tunnel + `productionUrl`（見 docs/HOST_DEPLOY.md）
+- [ ] 本機設 SMTP 後測真寄信
+- [ ] github.io 經 Tunnel 登入並連 Mac Codex
 
 ## 下一步
 
-1. 老師／學生角色權限接到上傳與編輯
-2. 線上表單編輯器 → MD
-3. Chat API + 可換 LLM 主機
-4. Auth 若需「線上也能登入」→ 另架 HTTPS Auth（雲端／校內）
+1. 穩定 Named Tunnel（固定 Auth HTTPS）
+2. 整份搬到 Windows 桌機（`host/start-windows.ps1`）連該機 Codex
+3. 老師／學生權限、編輯器、可擴展 LLM
 
 ## 本階段刻意還不做
 

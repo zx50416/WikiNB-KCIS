@@ -39,4 +39,5 @@ npm run dev                      # http://127.0.0.1:4321/WikiNB-KCIS/
 ```
 
 **線上站（瀏覽筆記）：** https://zx50416.github.io/WikiNB-KCIS/  
-登入／Codex 請用本機 `dev`（Pages 的 HTTPS 無法打本機 HTTP Auth）。
+**主機部署（Mac→Windows + Codex）：** 見 `docs/HOST_DEPLOY.md`（`host/start-mac.sh`、`host/tunnel-mac.sh`）  
+職員登入需主機 HTTPS Tunnel，不是只跑 `npm run auth`。

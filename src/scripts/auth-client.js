@@ -1,17 +1,45 @@
 /**
  * Auth + Codex API client
+ * - 本機 dev：打 auth.url（http://127.0.0.1:8788）
+ * - GitHub Pages：打 auth.productionUrl（主機 HTTPS Tunnel → Mac／未來 Windows 的 Auth+Codex）
  */
-function getAuthBase() {
+function readAuthConfig() {
   const el = document.getElementById('auth-config');
   if (el?.textContent) {
     try {
-      const cfg = JSON.parse(el.textContent);
-      return (cfg.url || 'http://127.0.0.1:8788').replace(/\/$/, '');
+      return JSON.parse(el.textContent);
     } catch {
       /* ignore */
     }
   }
-  return (import.meta.env.PUBLIC_AUTH_URL || 'http://127.0.0.1:8788').replace(/\/$/, '');
+  return {};
+}
+
+function getAuthBase() {
+  const cfg = readAuthConfig();
+  const local = (
+    cfg.url ||
+    import.meta.env.PUBLIC_AUTH_URL ||
+    'http://127.0.0.1:8788'
+  ).replace(/\/$/, '');
+  const production = String(
+    cfg.productionUrl || import.meta.env.PUBLIC_AUTH_PRODUCTION_URL || '',
+  ).replace(/\/$/, '');
+
+  if (typeof location !== 'undefined') {
+    const onPages = location.hostname.endsWith('github.io');
+    // 線上 Pages：連部署主機（Mac／未來 Windows）的 HTTPS Auth+Codex
+    if (onPages) {
+      if (production) return production;
+      return local; // 尚未設定 productionUrl 時會觸發 mixed-content 提示
+    }
+    // 本機開發網站
+    if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
+      return local;
+    }
+    if (production) return production;
+  }
+  return local;
 }
 
 export function getAuthUrl() {
@@ -32,7 +60,7 @@ async function authFetch(path, options = {}) {
     let message = data.error || data.message;
     if (!message) {
       if (res.status === 404) {
-        message = 'Auth API 找不到此功能，請重新啟動 npm run auth 後再試';
+        message = 'Auth API 找不到此功能，請重新啟動主機上的 npm run auth';
       } else {
         message = `連線失敗（HTTP ${res.status}）`;
       }
@@ -50,15 +78,17 @@ export function getAuthMixedContentBlock() {
   const base = getAuthBase();
   const pageIsHttps = location.protocol === 'https:';
   const authIsHttp = /^http:\/\//i.test(base);
-  if (pageIsHttps && authIsHttp) {
-    return {
-      online: false,
-      reason: 'mixed-content',
-      message:
-        '線上站（HTTPS）無法連本機 Auth（HTTP）——即使已執行 npm run auth 也一樣。請改開本機網站登入：http://127.0.0.1:4321/WikiNB-KCIS/login（需同時執行 npm run auth 與 npm run dev）。此站仍可瀏覽筆記。',
-    };
-  }
-  return null;
+  if (!(pageIsHttps && authIsHttp)) return null;
+
+  const cfg = readAuthConfig();
+  const hasProd = Boolean(String(cfg.productionUrl || '').trim());
+  return {
+    online: false,
+    reason: 'mixed-content',
+    message: hasProd
+      ? '主機 Auth 設定異常（仍指向 HTTP）。請檢查 config/sites.json 的 productionUrl 是否為 HTTPS Tunnel。'
+      : '線上站需連「主機」上的 Auth（HTTPS）。請在部署主機（目前 Mac，未來 Windows）執行 host 腳本並把 Tunnel 網址寫入 productionUrl 後重新部署。詳見 docs/HOST_DEPLOY.md。',
+  };
 }
 
 export async function checkAuthHealth() {

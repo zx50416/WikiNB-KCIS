@@ -7,7 +7,9 @@
   },
   "auth": {
     "url": "http://127.0.0.1:8788",
-    "mode": "roster+password"
+    "productionUrl": "",
+    "mode": "roster+password",
+    "note": "productionUrl = 主機 Auth 的 HTTPS（Cloudflare Tunnel）。線上 Pages 會優先使用它；本機 npm run dev 仍用 url。"
   },
   "sites": {
     "navigator": {

@@ -9,7 +9,9 @@
     "preview": "astro preview",
     "auth:install": "npm install --prefix auth",
     "auth": "npm run start --prefix auth",
-    "auth:dev": "npm run dev --prefix auth"
+    "auth:dev": "npm run dev --prefix auth",
+    "host:mac": "bash host/start-mac.sh",
+    "host:tunnel": "bash host/tunnel-mac.sh"
   },
   "dependencies": {
     "@astrojs/tailwind": "^6.0.2",

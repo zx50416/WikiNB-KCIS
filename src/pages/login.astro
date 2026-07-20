@@ -21,17 +21,13 @@ const base = import.meta.env.BASE_URL;
           class="mt-5 hidden rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-left text-sm leading-relaxed text-amber-950"
         ></div>
         <div id="login-local-hint" class="mt-3 hidden rounded-2xl border border-kc-blue/20 bg-white/70 p-4 text-sm text-kc-blue-deep">
-          <p class="font-semibold">本機登入步驟</p>
+          <p class="font-semibold">部署主機（Mac／Windows）設定</p>
           <ol class="mt-2 list-decimal space-y-1 pl-5 text-kc-muted">
-            <li>終端機 1：<code class="rounded bg-kc-mist px-1">npm run auth</code></li>
-            <li>終端機 2：<code class="rounded bg-kc-mist px-1">npm run dev</code></li>
-            <li>
-              開啟
-              <a class="font-semibold text-kc-blue underline" href="http://127.0.0.1:4321/WikiNB-KCIS/login">
-                http://127.0.0.1:4321/WikiNB-KCIS/login
-              </a>
-            </li>
+            <li>主機執行 <code class="rounded bg-kc-mist px-1">./host/start-mac.sh</code>（未來 Windows：<code class="rounded bg-kc-mist px-1">.\host\start-windows.ps1</code>）</li>
+            <li>另開 Tunnel：<code class="rounded bg-kc-mist px-1">./host/tunnel-mac.sh</code></li>
+            <li>把 HTTPS 網址寫入 <code class="rounded bg-kc-mist px-1">config/sites.json</code> 的 <code class="rounded bg-kc-mist px-1">productionUrl</code> 後 push</li>
           </ol>
+          <p class="mt-2 text-xs text-kc-muted">完整說明：docs/HOST_DEPLOY.md · 開發者本機仍可用 http://127.0.0.1:4321/WikiNB-KCIS/login</p>
         </div>
         <p id="login-error" class="mt-4 hidden text-center text-sm text-red-600" role="alert"></p>
         <p id="login-ok" class="mt-4 hidden text-center text-sm text-emerald-700"></p>

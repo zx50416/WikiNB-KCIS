@@ -41,14 +41,14 @@ export async function verifySessionToken(token) {
 }
 
 export function sessionCookieOptions({ maxAgeMs = 7 * 24 * 60 * 60 * 1000 } = {}) {
-  // GitHub Pages（https）打本機 Auth 時需 SameSite=None
-  const crossSite = String(process.env.COOKIE_SAMESITE || '').toLowerCase() === 'none';
-  const secure =
-    crossSite || String(process.env.AUTH_BASE_URL || '').startsWith('https');
+  // Pages（https）→ 主機 Auth（https tunnel）需 SameSite=None; Secure
+  const authHttps = String(process.env.AUTH_BASE_URL || '').startsWith('https');
+  const crossSite =
+    String(process.env.COOKIE_SAMESITE || '').toLowerCase() === 'none' || authHttps;
   return {
     httpOnly: true,
     sameSite: crossSite ? 'none' : 'lax',
-    secure,
+    secure: crossSite || authHttps,
     path: '/',
     maxAge: Math.floor(maxAgeMs / 1000),
   };
