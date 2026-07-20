@@ -55,7 +55,7 @@ export function getAuthMixedContentBlock() {
       online: false,
       reason: 'mixed-content',
       message:
-        '你正在用 GitHub Pages（HTTPS）。瀏覽器會擋對本機 Auth（HTTP）的連線。請在本機另開：npm run auth + npm run dev，用 http://127.0.0.1:4321/WikiNB-KCIS/ 登入與 Codex。線上站仍可瀏覽筆記。',
+        '線上站（HTTPS）無法連本機 Auth（HTTP）——即使已執行 npm run auth 也一樣。請改開本機網站登入：http://127.0.0.1:4321/WikiNB-KCIS/login（需同時執行 npm run auth 與 npm run dev）。此站仍可瀏覽筆記。',
     };
   }
   return null;
