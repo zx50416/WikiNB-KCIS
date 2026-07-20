@@ -84,25 +84,116 @@ export function getAuthMixedContentBlock() {
   const hasProd = Boolean(String(cfg.productionUrl || '').trim());
   return {
     online: false,
-    reason: 'mixed-content',
+    reason: hasProd ? 'bad-production-url' : 'need-tunnel',
     message: hasProd
-      ? '主機 Auth 設定異常（仍指向 HTTP）。請檢查 productionUrl 是否為 HTTPS Tunnel。'
-      : '線上站還不能連主機 Auth（尚未設定 Tunnel／productionUrl）。請依下方簡短步驟設定後再測。',
+      ? '主機 Auth 位址仍是 HTTP，線上站無法連線。'
+      : '線上站尚未設定 HTTPS Tunnel（productionUrl）。',
   };
 }
 
-export async function checkAuthHealth() {
+/** 專案在本機的預設路徑（交接／一鍵指令用） */
+export const HOST_PROJECT_DIR = '/Users/kaine/Desktop/Projects/WikiNB for KCIS';
+
+function hostCommands() {
+  const q = `"${HOST_PROJECT_DIR}"`;
+  return {
+    one: `cd ${q} && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh`,
+    stop: `cd ${q} && ./host/stop-mac.sh`,
+    auth: `cd ${q} && npm run auth`,
+    dev: `cd ${q} && npm run dev`,
+  };
+}
+
+/**
+ * 依目前網頁環境＋ Auth 健康狀態，回傳該顯示的說明與可複製終端機指令
+ */
+export async function diagnoseAuthConnection() {
+  const cfg = readAuthConfig();
+  const production = String(cfg.productionUrl || '').trim().replace(/\/$/, '');
+  const onPages = typeof location !== 'undefined' && location.hostname.endsWith('github.io');
+  const onLocal =
+    typeof location !== 'undefined' &&
+    (location.hostname === '127.0.0.1' || location.hostname === 'localhost');
+  const cmds = hostCommands();
+
   const blocked = getAuthMixedContentBlock();
-  if (blocked) return blocked;
+  if (blocked) {
+    return {
+      ...blocked,
+      title: '線上登入：請先在 Mac 開主機',
+      hint: '在「終端機」貼上下方指令（按複製）。跑完後約 1 分鐘再重新整理本頁。',
+      commands: [
+        { id: 'one', label: '一鍵啟動（Auth＋Tunnel＋寫入網址＋push）', cmd: cmds.one },
+      ],
+    };
+  }
+
   try {
-    return await authFetch('/api/health');
+    const health = await authFetch('/api/health');
+    return {
+      online: true,
+      reason: 'ok',
+      title: '',
+      message: '',
+      hint: '',
+      commands: [],
+      ...health,
+    };
   } catch {
+    if (onPages) {
+      return {
+        online: false,
+        reason: production ? 'host-offline' : 'need-tunnel',
+        title: production ? '主機 Auth／Tunnel 目前離線' : '尚未設定主機 Tunnel',
+        message: production
+          ? '已設定 productionUrl，但連不到主機。請在 Mac 終端機重新啟動。'
+          : '線上站需要主機 HTTPS Tunnel。',
+        hint: '請開「新的」終端機視窗貼上（不要貼在還在跑的舊視窗）。',
+        commands: [
+          { id: 'one', label: '重新一鍵啟動主機', cmd: cmds.one },
+          { id: 'stop', label: '（可選）先停止舊程序', cmd: cmds.stop },
+        ],
+        authBase: getAuthBase(),
+      };
+    }
+
+    if (onLocal) {
+      return {
+        online: false,
+        reason: 'local-auth-offline',
+        title: '本機 Auth 未連線',
+        message: '本機開發請開兩個終端機：一個 Auth、一個網站。',
+        hint: '各複製一段到「不同」終端機視窗貼上。',
+        commands: [
+          { id: 'auth', label: '終端機 1：啟動 Auth', cmd: cmds.auth },
+          { id: 'dev', label: '終端機 2：啟動網站（若還沒開）', cmd: cmds.dev },
+        ],
+        authBase: getAuthBase(),
+      };
+    }
+
     return {
       online: false,
       reason: 'offline',
-      message: 'Auth 未連線。請在本機專案資料夾執行 npm run auth（預設 http://127.0.0.1:8788）。',
+      title: 'Auth 未連線',
+      message: '請在部署主機終端機執行一鍵腳本。',
+      hint: '',
+      commands: [{ id: 'one', label: '一鍵啟動主機', cmd: cmds.one }],
     };
   }
+}
+
+export async function checkAuthHealth() {
+  const d = await diagnoseAuthConnection();
+  if (d.online) return d;
+  return {
+    online: false,
+    reason: d.reason,
+    message: d.message || d.title || 'Auth 未連線',
+    title: d.title,
+    hint: d.hint,
+    commands: d.commands || [],
+  };
 }
 
 export async function fetchMe() {
