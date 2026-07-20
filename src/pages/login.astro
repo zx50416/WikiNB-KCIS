@@ -35,7 +35,7 @@ const base = import.meta.env.BASE_URL;
             複製指令
           </button>
           <p class="mt-3 text-xs text-kc-muted">
-            跑完後終端機會再給你<strong>一行 push</strong>，再貼一次就會更新線上站。約 1 分鐘後重新整理本頁。
+            腳本會自動寫入網址並嘗試 <code class="rounded bg-kc-mist px-1">git push</code>。若終端機還停在日誌畫面，貼上的指令會「沒反應」——請開<strong>新視窗</strong>再貼，或重新跑一鍵腳本（已改成跑完不卡住）。
             停止主機：<code class="rounded bg-kc-mist px-1">./host/stop-mac.sh</code>
           </p>
           <p class="mt-2 text-xs text-kc-muted">
