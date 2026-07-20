@@ -138,26 +138,38 @@ echo "→ 用新設定重啟 Auth…"
 start_auth
 
 PUSH_CMD="cd \"$ROOT\" && git add config/sites.json && git commit -m \"Set Auth productionUrl for host tunnel\" && git push origin master"
+printf '%s\n' "$PUSH_CMD" >"$LOG_DIR/push-once.sh"
+chmod +x "$LOG_DIR/push-once.sh"
 
 echo ""
 echo "=========================================="
-echo " 幾乎完成！"
-echo " Tunnel 與 Auth 已在背景跑著（此視窗可關，但關機前勿殺程序）。"
+echo " 主機已就緒（Auth + Tunnel 在背景執行）"
 echo ""
-echo " 【交接／上線】請再貼上下面「一整行」更新網站："
+echo " 下一步：開「另一個」終端機視窗，貼上下面整段（不要貼在還在跑的這個視窗）："
 echo ""
+echo "bash \"$LOG_DIR/push-once.sh\""
+echo ""
+echo " 或直接貼："
 echo "$PUSH_CMD"
 echo ""
 echo " 約 1 分鐘後重新整理："
 echo " https://zx50416.github.io/WikiNB-KCIS/login"
+echo " 停止主機：./host/stop-mac.sh"
 echo "=========================================="
 echo ""
 
-if [[ "${AUTO_PUSH:-}" == "1" ]]; then
-  echo "→ AUTO_PUSH=1，自動 push…"
-  eval "$PUSH_CMD"
+# 預設自動 push（交接最省事）；若只要本機可設 SKIP_PUSH=1
+if [[ "${SKIP_PUSH:-}" != "1" ]]; then
+  echo "→ 自動更新線上站（git push）…"
+  if eval "$PUSH_CMD"; then
+    echo "✓ 已 push。約 1 分鐘後重新整理登入頁即可。"
+  else
+    echo "⚠ 自動 push 失敗。請開新終端機執行："
+    echo "bash \"$LOG_DIR/push-once.sh\""
+  fi
 fi
 
-echo "→ Tunnel 日誌持續輸出（Ctrl+C 只停顯示；程序仍在背景）。"
-echo "   停止主機：./host/stop-mac.sh"
-tail -f "$TUNNEL_LOG"
+echo ""
+echo "✓ 完成。此視窗可關閉；Auth／Tunnel 仍在背景。"
+echo "  （不再卡住等輸入——先前貼 git 沒反應，就是卡在日誌畫面。）"
+exit 0
