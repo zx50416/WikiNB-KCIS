@@ -44,17 +44,18 @@ npm run dev     # 終端機 2
 
 開啟：**http://127.0.0.1:4321/WikiNB-KCIS/login**
 
-## SMTP（用 kainnne 代寄信）
+## SMTP（個人 Gmail 代寄驗證碼）
 
+康橋 `@kcis.com.tw` Google 帳號無法使用應用程式密碼，改以 `chaos60649@gmail.com` 寄信。  
 編輯本機 `auth/.env`（勿 commit）：
 
 ```env
 DEV_LOG_CODE=false
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=587
-SMTP_USER=kainnne@kcis.com.tw
+SMTP_USER=chaos60649@gmail.com
 SMTP_PASS=你的16碼應用程式密碼
-SMTP_FROM=WikiNB KCIS <kainnne@kcis.com.tw>
+SMTP_FROM=WikiNB KCIS <chaos60649@gmail.com>
 FRONTEND_ORIGINS=https://zx50416.github.io
 ```
 

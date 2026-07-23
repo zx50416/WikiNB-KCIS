@@ -1,0 +1,94 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const base = import.meta.env.BASE_URL;
+---
+
+<BaseLayout title="Edit display name" description="Change your WikiNB display name">
+  <div class="animate-fadeIn mx-auto max-w-md">
+    <div class="kc-hero relative overflow-hidden rounded-[1.75rem] border px-6 py-10 sm:px-8">
+      <div class="kc-hero-glow" aria-hidden="true"></div>
+      <div class="relative z-[1]">
+        <h1 class="text-center font-display text-3xl font-bold text-kc-blue-deep" data-i18n="login.editNickname">
+          Edit display name
+        </h1>
+        <p id="nick-error" class="mt-4 hidden text-center text-sm text-red-600" role="alert"></p>
+        <p id="nick-ok" class="mt-4 hidden text-center text-sm text-emerald-700"></p>
+
+        <div class="mt-6 space-y-3">
+          <label class="block text-sm font-semibold text-kc-blue-deep" data-i18n="login.nicknameLabel"
+            >Display name (required)</label
+          >
+          <input id="nick-input" type="text" maxlength="20" class="search-input pl-5" autocomplete="nickname" />
+          <p class="text-xs text-kc-muted" data-i18n="login.nicknameHint">
+            Only Chinese, English letters, ( _  . ) are allowed; length 2–20 characters.
+          </p>
+          <button id="nick-save" type="button" class="kc-btn-primary w-full justify-center py-3" data-i18n="login.saveNickname"
+            >Save</button
+          >
+          <a href={base} class="block w-full text-center text-sm font-semibold text-kc-blue hover:text-kc-purple" data-i18n="notes.back"
+            >← Main</a
+          >
+        </div>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script>
+  import { displayUserName, fetchMe, updateMyNickname } from '../scripts/auth-client.js';
+
+  function pageBase() {
+    return document.documentElement.dataset.base || '/WikiNB-KCIS/';
+  }
+
+  const input = document.getElementById('nick-input');
+  const errEl = document.getElementById('nick-error');
+  const okEl = document.getElementById('nick-ok');
+
+  function showErr(msg) {
+    if (!errEl) return;
+    errEl.textContent = msg || '';
+    errEl.classList.toggle('hidden', !msg);
+  }
+  function showOk(msg) {
+    if (!okEl) return;
+    okEl.textContent = msg || '';
+    okEl.classList.toggle('hidden', !msg);
+  }
+
+  (async () => {
+    try {
+      const me = await fetchMe();
+      if (!me.authenticated || !me.user) {
+        window.location.href = `${pageBase()}login`;
+        return;
+      }
+      if (input) {
+        input.value = displayUserName(me.user);
+        input.focus();
+      }
+    } catch {
+      window.location.href = `${pageBase()}login`;
+    }
+  })();
+
+  document.getElementById('nick-save')?.addEventListener('click', async () => {
+    showErr('');
+    showOk('');
+    const nickname = input?.value?.trim() || '';
+    try {
+      await updateMyNickname(nickname);
+      showOk('Saved');
+      setTimeout(() => {
+        window.location.href = pageBase();
+      }, 600);
+    } catch (err) {
+      showErr(err.message || 'Could not update display name');
+    }
+  });
+
+  input?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('nick-save')?.click();
+  });
+</script>

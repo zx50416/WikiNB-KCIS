@@ -20,13 +20,15 @@
 
 ## 測試帳（見 roster.json）
 
-| Email | 角色 |
-|-------|------|
-| kainnne@kcis.com.tw | admin |
-| demo.teacher@example.com | teacher |
-| demo.student@example.com | student |
+| Email | 角色 | 備註 |
+|-------|------|------|
+| chaos60649@gmail.com | admin | 主要測試帳；SMTP 寄信帳號；目前唯一 `@gmail.com` |
+| kainnne@kcis.com.tw | admin | 康橋信箱預留 |
+| demo.teacher@example.com | teacher | 示範 |
+| demo.student@example.com | student | 示範 |
 
-未設 SMTP 時，驗證碼印在跑 `npm run auth` 的終端機。
+驗證碼由 `chaos60649@gmail.com` 經 SMTP 寄出（`auth/.env` 的 `SMTP_USER`）。  
+`DEV_LOG_CODE=false` 時不會印在終端機；未填 `SMTP_PASS` 則無法寄信。
 
 ## 可移植
 

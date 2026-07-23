@@ -12,10 +12,14 @@
 ## 目前階段
 
 - ✅ 靜態瀏覽／搜尋、i18n、KaTeX
-- ✅ 預核名單登入（Email → 驗證碼 → 密碼）
+- ✅ **Email 驗證碼登入**（OTP；到 `/login/success`）；暱稱可改（資料夾 id 不變）
+- ✅ `@kcis.com.tw` 預設學生；roster／例外信箱標老師
+- ✅ Wiki 儲存層改接 **Google Shared Drive**（需服務帳號 JSON；見 `docs/20260722_architecture_pages_drive_otp.md`）
+- ✅ Codex／Gemini：Gemini key 已進後端 `.env`（串流聊天下一階段）
 - ✅ GitHub Pages：https://zx50416.github.io/WikiNB-KCIS/
-- ✅ 主機架構（Mac 現在 → Windows 未來）：Auth + Codex CLI + Tunnel  
-  **技術守則（必讀）：** [`docs/TECH_STANDARD_HOST_AUTH_CODEX.md`](./docs/TECH_STANDARD_HOST_AUTH_CODEX.md)  
+- ✅ 主機架構（過渡：Mac + Tunnel）  
+  **架構定稿（2026-07-22）：** [`docs/20260722_architecture_pages_drive_otp.md`](./docs/20260722_architecture_pages_drive_otp.md)  
+  **技術守則：** [`docs/TECH_STANDARD_HOST_AUTH_CODEX.md`](./docs/TECH_STANDARD_HOST_AUTH_CODEX.md)  
   **操作手冊：** [`docs/HOST_DEPLOY.md`](./docs/HOST_DEPLOY.md)
 
 ## 改內容時
@@ -26,6 +30,7 @@
 4. 網站程式以 `src/lib/wiki.ts` 為讀取單一來源
 5. 密鑰只放 `auth/.env`，勿 commit
 6. 動到登入／部署／Codex 時遵守 `TECH_STANDARD_HOST_AUTH_CODEX.md`（禁止 Pages 直連 HTTP 本機 Auth）
+7. **禁止亂發測試驗證信** → [`docs/NO_TEST_OTP_EMAIL.md`](./docs/NO_TEST_OTP_EMAIL.md)（勿對同仁真實信箱打 OTP API）
 
 ## 品牌
 
@@ -46,4 +51,5 @@ npm run dev                      # http://127.0.0.1:4321/WikiNB-KCIS/
 ```
 
 **線上站：** https://zx50416.github.io/WikiNB-KCIS/  
+**本機專案資料夾：** `/Users/kaine/Desktop/Projects/WikiNB_for_KCIS`  
 職員登入／Codex = Pages + 主機 HTTPS Tunnel，不是只跑 `npm run auth`。

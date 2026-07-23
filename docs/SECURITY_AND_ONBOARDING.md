@@ -25,13 +25,15 @@
 
 ---
 
-## 2. 開通測試帳：`kainnne@kcis.com.tw`（已列入名單）
+## 2. 開通測試帳：`chaos60649@gmail.com`（已列入名單）
+
+**寄信策略：** 康橋 `@kcis.com.tw` Google 帳號無法使用「應用程式密碼」，因此驗證碼改由個人 Gmail `chaos60649@gmail.com` 經 SMTP 寄出。此帳號也是目前**唯一允許登入的 `@gmail.com`**。
 
 名單狀態（預設已寫入）：
 
 ```json
 {
-  "email": "kainnne@kcis.com.tw",
+  "email": "chaos60649@gmail.com",
   "name": "Kaine",
   "role": "admin"
 }
@@ -39,42 +41,46 @@
 
 ### 你要做的步驟（約 3 分鐘）
 
-1. **終端機 1 — 啟動 API**
+1. **填 SMTP 應用程式密碼**（只需做一次）
+
+在 `auth/.env` 填入 `chaos60649@gmail.com` 的 Google 應用程式密碼：
+
+```env
+SMTP_USER=chaos60649@gmail.com
+SMTP_PASS=你的16碼應用程式密碼
+DEV_LOG_CODE=false
+```
+
+2. **啟動主機**（線上登入用 Tunnel；本機測試見下）
 
 ```bash
 cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
-npm run auth
+./host/one-command-mac.sh
 ```
 
-看到類似：`WikiNB KCIS API  http://127.0.0.1:8788`
-
-2. **終端機 2 — 啟動網站**
+或本機雙開：
 
 ```bash
-cd "/Users/kaine/Desktop/Projects/WikiNB_for_KCIS"
-npm run dev
+npm run auth    # 終端機 1
+npm run dev     # 終端機 2
 ```
-
-開啟：http://127.0.0.1:4321/WikiNB-KCIS/login  
-
-（線上站 https://zx50416.github.io/WikiNB-KCIS/ 可瀏覽筆記；**登入請用本機網址**，見 [DEPLOY_PRIVATE_PAGES.md](./DEPLOY_PRIVATE_PAGES.md)）
 
 3. **首次設定密碼**
 
-- 登入頁**先只填** `kainnne@kcis.com.tw` →「繼續」  
-- 系統偵測尚未設密碼 → **自動寄驗證碼**（未設 SMTP 時看 Auth 終端機）  
+- 登入頁**先只填** `chaos60649@gmail.com` →「繼續」  
+- 系統偵測尚未設密碼 → **自動寄驗證碼到你的 Gmail 收件匣**  
 - 輸入驗證碼、新密碼、確認新密碼 → 登入  
 
 4. 成功後可用 Codex、右上角會顯示已登入。
 
-### 若要重設 kainnne 密碼
+### 若要重設密碼
 
 同樣走「忘記密碼／首次設定」寄碼即可；或刪掉 `auth/data/users.json` 裡該使用者後重設（開發用）。
 
-### 若要真的寄到學校信箱
+### 康橋信箱 `kainnne@kcis.com.tw`
 
-在 `auth/.env` 設定 Gmail 應用程式密碼等 SMTP 變數，並把 `DEV_LOG_CODE=false`（正式環境建議）。  
-見 `auth/.env.example`。
+仍保留在名單（admin），驗證碼會寄到該信箱，但**寄信帳號仍是** `chaos60649@gmail.com`。  
+詳見 `auth/.env.example`。
 
 ---
 

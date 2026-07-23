@@ -1,7 +1,8 @@
 import zhTW from '../locales/zh-TW.json';
 import en from '../locales/en.json';
 
-const STORAGE_KEY = 'wikinb-kcis-locale';
+const STORAGE_KEY = 'wikinb-kcis-locale-v2';
+const DEFAULT_LOCALE = 'en';
 const dictionaries = {
   'zh-TW': zhTW,
   en,
@@ -14,12 +15,12 @@ export function getLocale() {
   } catch {
     /* ignore */
   }
-  return 'zh-TW';
+  return DEFAULT_LOCALE;
 }
 
 export function t(key, vars = {}, locale = getLocale()) {
-  const dict = dictionaries[locale] || dictionaries['zh-TW'];
-  let text = dict[key] ?? dictionaries['zh-TW'][key] ?? key;
+  const dict = dictionaries[locale] || dictionaries[DEFAULT_LOCALE];
+  let text = dict[key] ?? dictionaries.en[key] ?? dictionaries['zh-TW'][key] ?? key;
   for (const [k, v] of Object.entries(vars)) {
     text = text.replaceAll(`{${k}}`, String(v));
   }

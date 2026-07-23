@@ -2,8 +2,10 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { getAllTeachers, getSubjectsForTeacher, getAllWikiPages, getPagesByTeacher } from '../lib/wiki';
 
-const teachers = getAllTeachers();
+const allTeachers = getAllTeachers();
 const pages = getAllWikiPages();
+/** 0 筆筆記的老師不列入列表／推薦 */
+const teachers = allTeachers.filter((t) => getPagesByTeacher(pages, t.id).length > 0);
 const base = import.meta.env.BASE_URL;
 ---
 

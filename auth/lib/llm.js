@@ -1,5 +1,5 @@
 /**
- * LLM Adapter — 預設 Codex CLI；之後可改 LLM_PROVIDER=openai|custom
+ * LLM Adapter — Gemini（預設）／Codex CLI
  */
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -8,7 +8,7 @@ import path from 'node:path';
 
 const execFileAsync = promisify(execFile);
 
-/** @type {Map<string, import('node:child_process').ChildProcess>} */
+/** @type {Map<string, { kill?: Function, abort?: AbortController } | import('node:child_process').ChildProcess>} */
 const activeJobs = new Map();
 
 const CODEX_MODELS = [
@@ -18,6 +18,13 @@ const CODEX_MODELS = [
   { id: 'o4-mini', label: 'o4-mini' },
 ];
 
+const GEMINI_MODELS = [
+  { id: 'gemini-flash-latest', label: 'gemini-flash-latest（預設）' },
+  { id: 'gemini-flash-lite-latest', label: 'gemini-flash-lite-latest' },
+  { id: 'gemini-2.0-flash', label: 'gemini-2.0-flash' },
+  { id: 'gemini-2.0-flash-lite', label: 'gemini-2.0-flash-lite' },
+];
+
 const CODEX_EFFORTS = [
   { id: 'low', label: '低（較快）' },
   { id: 'medium', label: '中（預設）' },
@@ -25,11 +32,72 @@ const CODEX_EFFORTS = [
 ];
 
 function provider() {
-  return String(process.env.LLM_PROVIDER || 'codex').toLowerCase();
+  return String(process.env.LLM_PROVIDER || 'gemini').toLowerCase();
 }
 
 function projectRoot() {
   return process.env.PROJECT_ROOT || path.resolve(process.cwd(), '..');
+}
+
+function geminiApiKey() {
+  return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '').trim();
+}
+
+function geminiApiMode() {
+  const mode = String(process.env.GEMINI_API_MODE || '').trim().toLowerCase();
+  if (mode === 'vertex' || mode === 'apikey') return mode;
+  // 有 GCP 專案＋服務帳號時預設走 Vertex（帳號密碼.md 的 cloud SA）
+  if (process.env.GOOGLE_CLOUD_PROJECT && process.env.GOOGLE_SERVICE_ACCOUNT_FILE) {
+    return 'vertex';
+  }
+  return 'apikey';
+}
+
+function defaultGeminiModel() {
+  return process.env.LLM_MODEL || 'gemini-flash-latest';
+}
+
+function cloudProject() {
+  return String(process.env.GOOGLE_CLOUD_PROJECT || '').trim();
+}
+
+function cloudLocation() {
+  return String(process.env.GOOGLE_CLOUD_LOCATION || 'us-central1').trim();
+}
+
+function resolveServiceAccountPath() {
+  const fromEnv = String(process.env.GOOGLE_SERVICE_ACCOUNT_FILE || '').trim();
+  const candidates = [];
+  if (fromEnv) {
+    if (path.isAbsolute(fromEnv)) candidates.push(fromEnv);
+    else {
+      candidates.push(path.resolve(process.cwd(), fromEnv));
+      candidates.push(path.resolve(projectRoot(), fromEnv));
+      candidates.push(path.resolve(projectRoot(), 'auth', fromEnv.replace(/^auth\//, '')));
+    }
+  }
+  candidates.push(path.resolve(projectRoot(), 'auth/secrets/drive-sa.json'));
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  return '';
+}
+
+async function getVertexAccessToken() {
+  const { getGoogleAccessToken } = await import('./google-auth.js');
+  return getGoogleAccessToken('https://www.googleapis.com/auth/cloud-platform');
+}
+
+function vertexModelUrl(model, stream = false) {
+  const project = cloudProject();
+  const location = cloudLocation();
+  if (!project) throw new Error('尚未設定 GOOGLE_CLOUD_PROJECT');
+  const action = stream ? 'streamGenerateContent' : 'generateContent';
+  const host =
+    location === 'global'
+      ? 'https://aiplatform.googleapis.com'
+      : `https://${location}-aiplatform.googleapis.com`;
+  return `${host}/v1/projects/${encodeURIComponent(project)}/locations/${encodeURIComponent(location)}/publishers/google/models/${encodeURIComponent(model)}:${action}${stream ? '?alt=sse' : ''}`;
 }
 
 function readCodexDefault(field, fallback) {
@@ -60,6 +128,49 @@ function listWikiSnapshot() {
   return names.slice(0, 80).join(', ') || '（尚無筆記）';
 }
 
+/** 讀取筆記全文（截斷）供 Gemini 當教材上下文 */
+function loadWikiCorpus(maxChars = 48000) {
+  const wikiDir = path.join(projectRoot(), 'wiki', 'teachers');
+  if (!fs.existsSync(wikiDir)) return '（尚無 wiki 筆記）';
+  const chunks = [];
+  let used = 0;
+  const walk = (dir, prefix = '') => {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      const rel = prefix ? `${prefix}/${ent.name}` : ent.name;
+      if (ent.isDirectory()) {
+        walk(path.join(dir, ent.name), rel);
+        continue;
+      }
+      if (!ent.name.endsWith('.md')) continue;
+      if (used >= maxChars) return;
+      const raw = fs.readFileSync(path.join(dir, ent.name), 'utf8');
+      const body = raw.slice(0, 3500);
+      const piece = `\n---\n檔案：teachers/${rel}\n${body}\n`;
+      if (used + piece.length > maxChars) return;
+      chunks.push(piece);
+      used += piece.length;
+    }
+  };
+  walk(wikiDir);
+  return chunks.join('') || '（尚無筆記）';
+}
+
+function buildSystemPrompt() {
+  return `你是 WikiNB · KCIS 的學習複習助理（Gemini × KCIS）。
+
+規則：
+- 依下方 wiki/teachers/ 教材回答；標示來源老師／科目／檔名
+- 可依 keywords（老師名、科目）篩選；使用者沒指定就用全部已發布內容
+- 使用繁體中文；可用 Markdown
+- 推測請標明；教材沒有的內容請誠實說不知道
+
+專案目錄：${projectRoot()}
+wiki 檔名快照：${listWikiSnapshot()}
+
+教材內容：
+${loadWikiCorpus()}`;
+}
+
 function buildPrompt(message, history) {
   const hist = Array.isArray(history)
     ? history
@@ -68,59 +179,92 @@ function buildPrompt(message, history) {
         .join('\n\n')
     : '';
 
-  return `你是 WikiNB · KCIS 的學習複習助理（本機 adapter：${provider()}）。
-
-規則：
-- 依 wiki/teachers/ 教材回答；標示來源老師／科目／檔名
-- 可依 keywords（老師名、科目）篩選；使用者沒指定就用全部已發布內容
-- 使用繁體中文；可用 Markdown
-- 推測請標明
-
-專案目錄：${projectRoot()}
-wiki 快照：${listWikiSnapshot()}
+  return `${buildSystemPrompt()}
 ${hist ? `\n稍早對話：\n${hist}\n` : ''}
 使用者問題：
 ${String(message || '').trim()}`;
 }
 
+function buildGeminiContents(message, history) {
+  const contents = [];
+  if (Array.isArray(history)) {
+    for (const turn of history.slice(-16)) {
+      const role = turn.role === 'assistant' ? 'model' : 'user';
+      const text = String(turn.content || '').trim();
+      if (!text) continue;
+      contents.push({ role, parts: [{ text: text.slice(0, 8000) }] });
+    }
+  }
+  contents.push({ role: 'user', parts: [{ text: String(message || '').trim() }] });
+  return contents;
+}
+
 export function getModelsPayload() {
+  if (provider() === 'gemini') {
+    const defaultModel = defaultGeminiModel();
+    return {
+      ok: true,
+      provider: 'gemini',
+      mode: geminiApiMode(),
+      defaultModel,
+      defaultEffort: 'default',
+      models: [{ id: defaultModel, label: '預設' }],
+      efforts: [{ id: 'default', label: '預設' }],
+      tips: [
+        'Gemini × KCIS：依 wiki 筆記回答。',
+        geminiApiMode() === 'vertex'
+          ? `Vertex AI（專案 ${cloudProject() || '?'} · ${cloudLocation()}）`
+          : geminiApiKey()
+            ? 'API Key 已設定。'
+            : '⚠ 尚未設定 GEMINI_API_KEY',
+      ],
+    };
+  }
+
   if (provider() === 'codex') {
     const defaultModel = readCodexDefault('model', 'gpt-5.6-terra');
     const defaultEffort = readCodexDefault('model_reasoning_effort', 'medium');
-    const models = [...CODEX_MODELS];
-    if (!models.some((m) => m.id === defaultModel)) {
-      models.unshift({ id: defaultModel, label: `${defaultModel}（本機）` });
-    }
     return {
       ok: true,
       provider: 'codex',
       defaultModel,
       defaultEffort,
-      models,
-      efforts: CODEX_EFFORTS,
-      tips: ['簡單問答約 15–60 秒；複雜題可能更久。正式環境可改 LLM_PROVIDER。'],
+      models: [{ id: defaultModel, label: '預設' }],
+      efforts: [{ id: defaultEffort, label: '預設' }],
+      tips: ['簡單問答約 15–60 秒；複雜題可能更久。'],
     };
   }
 
   return {
-    ok: true,
+    ok: false,
     provider: provider(),
-    defaultModel: process.env.LLM_MODEL || 'default',
-    defaultEffort: 'medium',
-    models: [{ id: process.env.LLM_MODEL || 'default', label: process.env.LLM_MODEL || 'default' }],
-    efforts: CODEX_EFFORTS,
-    tips: [`目前 provider=${provider()}（請實作對應 adapter）`],
+    defaultModel: 'default',
+    defaultEffort: 'default',
+    models: [{ id: 'default', label: '預設' }],
+    efforts: [{ id: 'default', label: '預設' }],
+    tips: [`LLM_PROVIDER=${provider()} 尚未實作`],
+    error: `LLM_PROVIDER=${provider()} 尚未實作；請設 LLM_PROVIDER=gemini`,
   };
 }
 
 export function stopJob(sessionKey) {
-  const child = activeJobs.get(sessionKey);
-  if (!child || child.killed) return { stopped: false };
-  child.kill('SIGTERM');
-  setTimeout(() => {
-    if (!child.killed) child.kill('SIGKILL');
-  }, 1500);
-  return { stopped: true };
+  const job = activeJobs.get(sessionKey);
+  if (!job) return { stopped: false };
+  if (typeof job.abort === 'function' || job.abort instanceof AbortController) {
+    const ctrl = job.abort instanceof AbortController ? job.abort : null;
+    ctrl?.abort();
+    if (typeof job.kill === 'function') job.kill();
+    activeJobs.delete(sessionKey);
+    return { stopped: true };
+  }
+  if (job.kill && !job.killed) {
+    job.kill('SIGTERM');
+    setTimeout(() => {
+      if (!job.killed) job.kill('SIGKILL');
+    }, 1500);
+    return { stopped: true };
+  }
+  return { stopped: false };
 }
 
 function extractCodexText(ev) {
@@ -156,10 +300,94 @@ function summarizeCodexEvent(ev) {
   return t;
 }
 
+function extractGeminiText(payload) {
+  const parts = payload?.candidates?.[0]?.content?.parts;
+  if (!Array.isArray(parts)) return '';
+  return parts
+    .map((p) => (typeof p?.text === 'string' ? p.text : ''))
+    .join('');
+}
+
+function geminiRequestBody(message, history) {
+  return {
+    systemInstruction: { parts: [{ text: buildSystemPrompt() }] },
+    contents: buildGeminiContents(message, history),
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+    },
+  };
+}
+
+function formatGeminiHttpError(res, data) {
+  const detail = data?.error?.message || JSON.stringify(data).slice(0, 400);
+  if (res.status === 403 || /denied access|PERMISSION_DENIED/i.test(detail)) {
+    return (
+      'Gemini／Vertex 權限被拒（403）。若走 Vertex：請在 GCP 啟用 Vertex AI API，並給服務帳號 Vertex AI User 角色。' +
+      ' 若走 API Key：請到 https://aistudio.google.com/apikey 開新金鑰。'
+    );
+  }
+  if (res.status === 429 || /quota|RESOURCE_EXHAUSTED/i.test(detail)) {
+    return 'Gemini 配額用盡（429）。請檢查 GCP／AI Studio 用量或啟用計費。';
+  }
+  return `Gemini API ${res.status}: ${detail}`;
+}
+
+async function geminiGenerateApiKey({ message, history, model, signal }) {
+  const key = geminiApiKey();
+  if (!key) throw new Error('尚未設定 GEMINI_API_KEY（請填 auth/.env）');
+  const chosenModel = model || defaultGeminiModel();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(chosenModel)}:generateContent?key=${encodeURIComponent(key)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(geminiRequestBody(message, history)),
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatGeminiHttpError(res, data));
+  const answer = extractGeminiText(data).trim() || '（無回應）';
+  return { answer, model: chosenModel, provider: 'gemini', mode: 'apikey', raw: data };
+}
+
+async function geminiGenerateVertex({ message, history, model, signal }) {
+  const chosenModel = model || defaultGeminiModel();
+  const token = await getVertexAccessToken();
+  const url = vertexModelUrl(chosenModel, false);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(geminiRequestBody(message, history)),
+    signal,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatGeminiHttpError(res, data));
+  const answer = extractGeminiText(data).trim() || '（無回應）';
+  return { answer, model: chosenModel, provider: 'gemini', mode: 'vertex', raw: data };
+}
+
+async function geminiGenerate(opts) {
+  if (geminiApiMode() === 'vertex') return geminiGenerateVertex(opts);
+  return geminiGenerateApiKey(opts);
+}
+
 /** 非串流（fallback） */
 export async function chatOnce({ message, history, model, reasoningEffort }) {
+  if (provider() === 'gemini') {
+    const result = await geminiGenerate({ message, history, model });
+    return {
+      answer: result.answer,
+      model: result.model,
+      reasoningEffort: reasoningEffort || 'medium',
+      provider: 'gemini',
+    };
+  }
+
   if (provider() !== 'codex') {
-    throw new Error(`LLM_PROVIDER=${provider()} 尚未實作；請設 LLM_PROVIDER=codex 或擴充 adapter`);
+    throw new Error(`LLM_PROVIDER=${provider()} 尚未實作；請設 LLM_PROVIDER=gemini 或 codex`);
   }
   const prompt = buildPrompt(message, history);
   const chosenModel = model || readCodexDefault('model', 'gpt-5.6-terra');
@@ -194,12 +422,199 @@ export async function chatOnce({ message, history, model, reasoningEffort }) {
   };
 }
 
-/** SSE 串流 Codex */
+function beginSse(res) {
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders?.();
+}
+
+function sseSend(res, payload) {
+  if (res.writableEnded) return;
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+}
+
+async function chatStreamGemini(res, { message, history, model, reasoningEffort, sessionKey }) {
+  beginSse(res);
+  const chosenModel = model || defaultGeminiModel();
+  const effort = reasoningEffort || 'medium';
+  const startedAt = Date.now();
+  const abort = new AbortController();
+  const tick = setInterval(() => sseSend(res, { type: 'tick', elapsedMs: Date.now() - startedAt }), 1000);
+
+  activeJobs.set(sessionKey || `gemini-${startedAt}`, {
+    abort,
+    kill: () => abort.abort(),
+  });
+
+  sseSend(res, {
+    type: 'status',
+    message: `啟動 Gemini（${chosenModel}）…`,
+    model: chosenModel,
+  });
+
+  let stoppedByUser = false;
+  res.on('close', () => {
+    if (res.writableEnded) return;
+    stoppedByUser = true;
+    abort.abort();
+  });
+
+  try {
+    const mode = geminiApiMode();
+    const body = geminiRequestBody(message, history);
+    let streamUrl = '';
+    /** @type {Record<string, string>} */
+    const headers = { 'Content-Type': 'application/json' };
+
+    if (mode === 'vertex') {
+      const token = await getVertexAccessToken();
+      streamUrl = vertexModelUrl(chosenModel, true);
+      headers.Authorization = `Bearer ${token}`;
+      sseSend(res, {
+        type: 'status',
+        message: `啟動 Vertex Gemini（${chosenModel} · ${cloudLocation()}）…`,
+        model: chosenModel,
+      });
+    } else {
+      const key = geminiApiKey();
+      if (!key) throw new Error('尚未設定 GEMINI_API_KEY（請填 auth/.env）');
+      streamUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(chosenModel)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(key)}`;
+    }
+
+    const upstream = await fetch(streamUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+      signal: abort.signal,
+    });
+
+    if (!upstream.ok) {
+      const errText = await upstream.text().catch(() => '');
+      let detail = errText.slice(0, 500);
+      try {
+        detail = JSON.parse(errText)?.error?.message || detail;
+      } catch {
+        /* ignore */
+      }
+      // 串流失敗 → 非串流 fallback
+      sseSend(res, { type: 'status', message: '串流不可用，改用一般回覆…' });
+      const once = await geminiGenerate({
+        message,
+        history,
+        model: chosenModel,
+        signal: abort.signal,
+      });
+      sseSend(res, { type: 'delta', text: once.answer });
+      sseSend(res, {
+        type: 'done',
+        ok: true,
+        answer: once.answer,
+        elapsedMs: Date.now() - startedAt,
+        model: chosenModel,
+        reasoningEffort: effort,
+        provider: 'gemini',
+        mode,
+        fallback: true,
+        streamError: detail,
+      });
+      return;
+    }
+
+    const reader = upstream.body?.getReader();
+    if (!reader) throw new Error('Gemini 未回傳串流內容');
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let answer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const blocks = buffer.split('\n\n');
+      buffer = blocks.pop() || '';
+      for (const block of blocks) {
+        const dataLine = block
+          .split('\n')
+          .filter((l) => l.startsWith('data:'))
+          .map((l) => l.slice(5).trim())
+          .join('');
+        if (!dataLine || dataLine === '[DONE]') continue;
+        let parsed;
+        try {
+          parsed = JSON.parse(dataLine);
+        } catch {
+          continue;
+        }
+        const piece = extractGeminiText(parsed);
+        if (piece) {
+          answer += piece;
+          sseSend(res, { type: 'delta', text: piece });
+        }
+      }
+    }
+
+    if (!answer.trim()) {
+      const once = await geminiGenerate({
+        message,
+        history,
+        model: chosenModel,
+        signal: abort.signal,
+      });
+      answer = once.answer;
+      sseSend(res, { type: 'delta', text: answer });
+    }
+
+    sseSend(res, {
+      type: 'done',
+      ok: true,
+      stopped: stoppedByUser,
+      answer: answer.trim() || '（無回應）',
+      elapsedMs: Date.now() - startedAt,
+      model: chosenModel,
+      reasoningEffort: effort,
+      provider: 'gemini',
+      mode,
+    });
+  } catch (err) {
+    if (abort.signal.aborted || stoppedByUser) {
+      sseSend(res, {
+        type: 'done',
+        ok: true,
+        stopped: true,
+        answer: '（已停止）',
+        elapsedMs: Date.now() - startedAt,
+        model: chosenModel,
+        provider: 'gemini',
+      });
+    } else {
+      sseSend(res, {
+        type: 'error',
+        error: err?.message || 'Gemini 執行失敗',
+        elapsedMs: Date.now() - startedAt,
+        model: chosenModel,
+      });
+    }
+  } finally {
+    clearInterval(tick);
+    if (sessionKey) activeJobs.delete(sessionKey);
+    if (!res.writableEnded) res.end();
+  }
+}
+
+/** SSE 串流 */
 export function chatStream(res, { message, history, model, reasoningEffort, sessionKey }) {
+  if (provider() === 'gemini') {
+    chatStreamGemini(res, { message, history, model, reasoningEffort, sessionKey });
+    return;
+  }
+
   if (provider() !== 'codex') {
-    res.write(
-      `data: ${JSON.stringify({ type: 'error', error: `LLM_PROVIDER=${provider()} 尚未實作` })}\n\n`,
-    );
+    beginSse(res);
+    sseSend(res, {
+      type: 'error',
+      error: `LLM_PROVIDER=${provider()} 尚未實作`,
+    });
     res.end();
     return;
   }
@@ -208,15 +623,9 @@ export function chatStream(res, { message, history, model, reasoningEffort, sess
   const chosenModel = model || readCodexDefault('model', 'gpt-5.6-terra');
   const effort = reasoningEffort || readCodexDefault('model_reasoning_effort', 'medium');
 
-  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache, no-transform');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders?.();
+  beginSse(res);
 
-  const send = (payload) => {
-    if (res.writableEnded) return;
-    res.write(`data: ${JSON.stringify(payload)}\n\n`);
-  };
+  const send = (payload) => sseSend(res, payload);
 
   send({ type: 'status', message: `啟動 Codex（${chosenModel} · ${effort}）…`, model: chosenModel });
 

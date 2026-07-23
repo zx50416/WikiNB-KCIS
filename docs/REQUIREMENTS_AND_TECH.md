@@ -173,9 +173,10 @@ tags:                      # 選用，非固定 keywords
 | `/search` | 搜尋與展開瀏覽；可依老師／科目關鍵字過濾 | ✅ |
 | `/wiki/[...slug]` | 筆記專頁 | ✅ |
 | `/teachers` | 老師列表（由 `_meta.json` 產生） | ✅ |
-| `/login` | 登入 | 🔜 下一步 |
-| `/editor` | 老師線上編輯器（表單 → MD） | 🔜 |
-| `/codex` 或 `/chat` | AI 複習介面 | 🔜 |
+| `/login` | 預核名單登入（Email → 驗證碼 → 密碼；老師需暱稱） | ✅ |
+| `/editor` | 老師線上 Markdown 編輯器（上傳／下載／儲存） | ✅ |
+| `/rename` | 老師重新命名筆記檔名 | ✅ |
+| `/codex` | Codex CLI 複習助理（串流、上傳 MD） | ✅ |
 
 品牌：
 
@@ -340,7 +341,7 @@ LLM Adapter
 ## 12. 程式目錄（初版 repo）
 
 ```text
-WikiNB for KCIS/
+WikiNB_for_KCIS/
 ├── README.md
 ├── AGENTS.md
 ├── docs/
@@ -381,4 +382,4 @@ WikiNB for KCIS/
 |------|------|
 | 個人 WikiNB | `/Users/kaine/Desktop/Projects/WikiNB` |
 | 康橋導航站 | `/Users/kaine/Desktop/康橋/應用導航網站_20260717` |
-| 本專案 | `/Users/kaine/Desktop/Projects/WikiNB for KCIS` |
+| 本專案 | `/Users/kaine/Desktop/Projects/WikiNB_for_KCIS` |

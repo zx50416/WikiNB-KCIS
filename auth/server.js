@@ -4,30 +4,52 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeEmail } from './lib/domain.js';
+import { isTeacherRole, requiresNicknameOnSetup } from './lib/account.js';
+import { getDriveStatus } from './lib/drive.js';
+import { normalizeEmail, rejectReasonForEmail } from './lib/domain.js';
 import { chatOnce, chatStream, getModelsPayload, stopJob } from './lib/llm.js';
 import { createLoginCode, checkLoginCode, sendCodeEmail, verifyLoginCode } from './lib/mail-code.js';
-import { findRosterEntry, getRosterPath, isPreApproved } from './lib/roster.js';
+import { getRosterPath, resolveLoginRoster } from './lib/roster.js';
 import {
   createSessionToken,
   getSessionCookieName,
   sessionCookieOptions,
+  clearSessionCookieOptions,
   verifySessionToken,
 } from './lib/session.js';
 import {
+  findUserByEmail,
   ensureUserFromRoster,
   getUsersFilePath,
-  hasPassword,
+  isAccountReady,
+  needsNicknameSetup,
   publicUser,
+  completeOtpLogin,
+  updateNickname,
   setPassword,
   verifyPassword,
 } from './lib/users.js';
+import {
+  listSubjectsForTeacher,
+  listTeacherFiles,
+  listAllTeacherFiles,
+  readTeacherFile,
+  renameTeacherFile,
+  resolveWriteTeacherId,
+  runWikiSync,
+  uploadTeacherFile,
+  deleteTeacherFile,
+  provisionTeacherWorkspace,
+  syncTeacherNicknameToWiki,
+} from './lib/wiki.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.join(__dirname, '.env') });
+// override:true — 避免父程序殘留 PORT=8788 蓋掉 auth/.env 的 8790
+dotenv.config({ path: path.join(__dirname, '.env'), override: true });
 
-const PORT = Number(process.env.PORT || 8788);
-const HOST = process.env.HOST || '127.0.0.1';
+const PORT = Number(process.env.PORT || 8790);
+// 0.0.0.0：同時接受 localhost 與 127.0.0.1（避免本機前端打不通）
+const HOST = process.env.HOST || '0.0.0.0';
 const PROJECT_ROOT = process.env.PROJECT_ROOT || path.resolve(__dirname, '..');
 process.env.PROJECT_ROOT = PROJECT_ROOT;
 
@@ -35,7 +57,11 @@ const app = express();
 app.use(express.json({ limit: '2mb' }));
 app.use(cookieParser());
 const allowedOrigins = [
-  process.env.FRONTEND_ORIGIN || 'http://127.0.0.1:4321',
+  process.env.FRONTEND_ORIGIN || 'http://127.0.0.1:4322',
+  'http://localhost:4322',
+  'http://127.0.0.1:4322',
+  'http://localhost:4323',
+  'http://127.0.0.1:4323',
   'http://localhost:4321',
   'http://127.0.0.1:4321',
   'https://zx50416.github.io',
@@ -83,12 +109,42 @@ async function requireAuth(req, res, next) {
   next();
 }
 
+async function requireTeacher(req, res, next) {
+  const session = await readSession(req);
+  if (!session) {
+    res.status(401).json({ error: '未登入或 session 已過期' });
+    return;
+  }
+  if (!resolveWriteTeacherId(session)) {
+    res.status(403).json({ error: '僅老師或管理員可執行此操作' });
+    return;
+  }
+  req.user = session;
+  next();
+}
+
+async function issueSession(res, user) {
+  const token = await createSessionToken(user);
+  res.cookie(getSessionCookieName(), token, sessionCookieOptions());
+}
+
+async function maybeProvisionTeacher(user) {
+  if (isTeacherRole(user.role) && user.teacherId) {
+    await provisionTeacherWorkspace({
+      teacherId: user.teacherId,
+      nickname: user.nickname,
+      name: user.name,
+    });
+  }
+}
+
 app.get('/api/health', (_req, res) => {
   res.json({
     online: true,
     service: 'wikinb-kcis-api',
-    authMode: 'roster+password',
-    llmProvider: process.env.LLM_PROVIDER || 'codex',
+    authMode: 'email-otp',
+    llmProvider: process.env.LLM_PROVIDER || 'gemini',
+    drive: getDriveStatus(),
     rosterFile: getRosterPath(),
     usersFile: getUsersFilePath(),
   });
@@ -97,8 +153,8 @@ app.get('/api/health', (_req, res) => {
 app.get('/api/auth/config', (_req, res) => {
   res.json({
     ok: true,
-    mode: 'roster',
-    message: '僅預核名單帳號可設密碼登入；老師與學生流程相同。',
+    mode: 'email-otp',
+    message: '僅 @kcis.com.tw 與核准測試信箱可登入；每次以 Email 驗證碼登入。',
   });
 });
 
@@ -108,19 +164,18 @@ app.get('/api/auth/me', async (req, res) => {
     res.status(401).json({ ok: false, authenticated: false });
     return;
   }
-  res.json({ ok: true, authenticated: true, user: session });
+  const dbUser = findUserByEmail(session.email);
+  const user = dbUser ? publicUser(dbUser) : session;
+  res.json({ ok: true, authenticated: true, user });
 });
 
 app.post('/api/auth/logout', (_req, res) => {
-  res.clearCookie(getSessionCookieName(), { path: '/' });
+  res.clearCookie(getSessionCookieName(), clearSessionCookieOptions());
   res.json({ ok: true });
 });
 
 /**
- * 第一步：只送 Email
- * - 不在名單 → 拒絕
- * - 首次（未設密碼）→ 自動寄驗證碼，回 step=setup
- * - 已設密碼 → 回 step=password（前端顯示密碼欄）
+ * 第一步：只送 Email → 一律寄驗證碼（驗證碼登入）
  */
 app.post('/api/auth/lookup', async (req, res) => {
   try {
@@ -129,58 +184,64 @@ app.post('/api/auth/lookup', async (req, res) => {
       res.status(400).json({ error: '請輸入 Email' });
       return;
     }
-    const roster = findRosterEntry(email);
+    const denied = rejectReasonForEmail(email);
+    if (denied) {
+      res.status(403).json({ error: denied });
+      return;
+    }
+    const roster = resolveLoginRoster(email);
     if (!roster) {
-      res.status(403).json({ error: '此帳號未在預核名單中，請聯繫管理員開通。' });
+      res.status(403).json({ error: rejectReasonForEmail(email) || '此帳號不允許登入' });
       return;
     }
 
     ensureUserFromRoster(roster);
-    const ready = hasPassword(email);
-
-    if (ready) {
-      res.json({
-        ok: true,
-        step: 'password',
-        email,
-        name: roster.name || email,
-        message: '請輸入密碼登入',
-      });
-      return;
-    }
-
-    const { code, expiresIn } = createLoginCode(email, 'setup');
+    const { code, expiresIn } = createLoginCode(email, 'login');
     const sendResult = await sendCodeEmail(email, code);
     res.json({
       ok: true,
-      step: 'setup',
+      step: 'code',
       email,
       name: roster.name || email,
+      role: roster.role || 'student',
+      teacherId: roster.teacherId || '',
+      needsNickname: needsNicknameSetup(email),
+      ready: isAccountReady(email),
       expiresIn,
-      purpose: 'setup',
-      message: sendResult.dev
-        ? '首次使用：驗證碼已顯示於 Auth 終端機（未設定 SMTP）'
-        : '首次使用：驗證碼已寄至你的信箱',
+      purpose: 'login',
+      message: sendResult.message
+        ? sendResult.message
+        : sendResult.dev
+          ? '驗證碼已顯示於 Auth 終端機（請看 npm run auth 視窗）'
+          : '驗證碼已寄至你的 Email 信箱，請查收',
       dev: Boolean(sendResult.dev),
+      fallback: Boolean(sendResult.fallback),
     });
   } catch (err) {
     console.error('lookup:', err);
-    res.status(500).json({ error: '無法驗證 Email，請稍後再試' });
+    res.status(err.message?.includes('SMTP') || err.message?.includes('寄信') ? 503 : 500).json({
+      error: err.message || '無法驗證 Email，請稍後再試',
+    });
   }
 });
 
-/** 寄驗證碼：必須在 roster；用途 setup（首次／重設） */
+/** 寄驗證碼：login／setup／reset */
 app.post('/api/auth/send-code', async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
-    const purpose = req.body?.purpose === 'reset' ? 'reset' : 'setup';
+    const purpose =
+      req.body?.purpose === 'reset'
+        ? 'reset'
+        : req.body?.purpose === 'setup'
+          ? 'setup'
+          : 'login';
     if (!email) {
       res.status(400).json({ error: '請輸入 Email' });
       return;
     }
-    const roster = findRosterEntry(email);
+    const roster = resolveLoginRoster(email);
     if (!roster) {
-      res.status(403).json({ error: '此帳號未在預核名單中，無法註冊或重設密碼。請聯繫管理員。' });
+      res.status(403).json({ error: rejectReasonForEmail(email) || '此帳號不允許登入' });
       return;
     }
 
@@ -191,72 +252,221 @@ app.post('/api/auth/send-code', async (req, res) => {
       ok: true,
       expiresIn,
       purpose,
-      hasPassword: hasPassword(email),
-      message: sendResult.dev
-        ? '驗證碼已顯示於 Auth 終端機（未設定 SMTP）'
-        : '驗證碼已寄出，請查收信箱',
+      needsNickname: needsNicknameSetup(email),
+      message: sendResult.message
+        ? sendResult.message
+        : sendResult.dev
+          ? '驗證碼已顯示於 Auth 終端機（請看 npm run auth 視窗）'
+          : '驗證碼已寄至你的 Email 信箱，請查收',
       dev: Boolean(sendResult.dev),
+      fallback: Boolean(sendResult.fallback),
     });
   } catch (err) {
     console.error('send-code:', err);
-    res.status(500).json({ error: '寄送驗證碼失敗' });
+    res.status(err.message?.includes('SMTP') || err.message?.includes('寄信') ? 503 : 500).json({
+      error: err.message || '寄送驗證碼失敗',
+    });
   }
 });
 
-/** 只驗證驗證碼是否正確（不登入、不消耗；設密碼時再消耗） */
+/** 驗證驗證碼（不登入、不消耗）；若已有暱稱可直接走 login-with-code */
 app.post('/api/auth/verify-code', async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const code = String(req.body?.code || '');
-    const purpose = req.body?.purpose === 'reset' ? 'reset' : 'setup';
+    const purpose =
+      req.body?.purpose === 'reset'
+        ? 'reset'
+        : req.body?.purpose === 'setup'
+          ? 'setup'
+          : 'login';
     if (!email || !code) {
       res.status(400).json({ error: '請輸入 Email 與驗證碼' });
       return;
     }
-    if (!isPreApproved(email)) {
-      res.status(403).json({ error: '此帳號未在預核名單中' });
+    if (!resolveLoginRoster(email)) {
+      res.status(403).json({ error: '此帳號不允許登入' });
       return;
     }
     const checked = checkLoginCode(email, code, purpose);
     if (!checked.ok) {
-      res.status(400).json({ error: checked.error });
-      return;
+      // 相容：若前端傳 setup 但實際是 login 碼
+      if (purpose !== 'login') {
+        const alt = checkLoginCode(email, code, 'login');
+        if (!alt.ok) {
+          res.status(400).json({ error: checked.error });
+          return;
+        }
+      } else {
+        res.status(400).json({ error: checked.error });
+        return;
+      }
     }
-    res.json({ ok: true, message: '驗證碼正確，請設定新密碼' });
+    const roster = resolveLoginRoster(email);
+    const needNick = needsNicknameSetup(email);
+    res.json({
+      ok: true,
+      message: needNick ? '驗證碼正確，請設定暱稱' : '驗證碼正確，可完成登入',
+      role: roster?.role || 'student',
+      needsNickname: needNick,
+      next: needNick ? 'setup' : 'login',
+    });
   } catch (err) {
     console.error('verify-code:', err);
     res.status(500).json({ error: '驗證失敗' });
   }
 });
 
-/** 驗證碼正確後設定／重設密碼，並直接登入 */
-app.post('/api/auth/set-password', async (req, res) => {
+/** 驗證碼登入（已有暱稱） */
+app.post('/api/auth/login-with-code', async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
     const code = String(req.body?.code || '');
-    const password = String(req.body?.password || '');
-    const purpose = req.body?.purpose === 'reset' ? 'reset' : 'setup';
-
-    if (!email || !code || password.length < 8) {
-      res.status(400).json({ error: '請提供 Email、驗證碼，且密碼至少 8 碼' });
+    const purpose = req.body?.purpose === 'setup' ? 'setup' : 'login';
+    if (!email || !code) {
+      res.status(400).json({ error: '請輸入 Email 與驗證碼' });
       return;
     }
-    if (!isPreApproved(email)) {
-      res.status(403).json({ error: '此帳號未在預核名單中' });
+    const roster = resolveLoginRoster(email);
+    if (!roster) {
+      res.status(403).json({ error: '此帳號不允許登入' });
+      return;
+    }
+    if (needsNicknameSetup(email)) {
+      res.status(400).json({
+        error: '首次登入請先設定暱稱',
+        needSetup: true,
+      });
       return;
     }
 
-    const checked = verifyLoginCode(email, code, purpose);
+    let checked = verifyLoginCode(email, code, purpose);
+    if (!checked.ok && purpose !== 'login') {
+      checked = verifyLoginCode(email, code, 'login');
+    }
     if (!checked.ok) {
       res.status(400).json({ error: checked.error });
       return;
     }
 
-    const roster = findRosterEntry(email);
     ensureUserFromRoster(roster);
-    const user = await setPassword(email, password);
-    const token = await createSessionToken(user);
-    res.cookie(getSessionCookieName(), token, sessionCookieOptions());
+    const user = completeOtpLogin(email);
+    await maybeProvisionTeacher(user);
+    await issueSession(res, user);
+    res.json({ ok: true, user, message: '登入成功' });
+  } catch (err) {
+    console.error('login-with-code:', err);
+    res.status(500).json({ error: err.message || '登入失敗' });
+  }
+});
+
+/** 首次：驗證碼 + 暱稱 → 登入（不再要求密碼） */
+app.post('/api/auth/complete-setup', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || '');
+    const nickname = String(req.body?.nickname || '').trim();
+    const purpose = req.body?.purpose === 'setup' ? 'setup' : 'login';
+
+    if (!email || !code) {
+      res.status(400).json({ error: '請提供 Email 與驗證碼' });
+      return;
+    }
+    const roster = resolveLoginRoster(email);
+    if (!roster) {
+      res.status(403).json({ error: '此帳號不允許登入' });
+      return;
+    }
+    if (requiresNicknameOnSetup(roster.role, 'setup') && !nickname) {
+      res.status(400).json({ error: '首次設定請填寫暱稱（顯示名稱）' });
+      return;
+    }
+
+    let checked = verifyLoginCode(email, code, purpose);
+    if (!checked.ok) {
+      checked = verifyLoginCode(email, code, purpose === 'login' ? 'setup' : 'login');
+    }
+    if (!checked.ok) {
+      res.status(400).json({ error: checked.error });
+      return;
+    }
+
+    ensureUserFromRoster(roster);
+    const user = completeOtpLogin(email, { nickname });
+    await maybeProvisionTeacher(user);
+    await issueSession(res, user);
+    res.json({
+      ok: true,
+      user,
+      message: '帳號設定完成並已登入',
+    });
+  } catch (err) {
+    console.error('complete-setup:', err);
+    res.status(400).json({ error: err.message || '設定失敗' });
+  }
+});
+
+/** 相容舊前端：驗證碼 + 密碼（可選） */
+app.post('/api/auth/set-password', async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const code = String(req.body?.code || '');
+    const password = String(req.body?.password || '');
+    const nickname = String(req.body?.nickname || '').trim();
+    const purpose = req.body?.purpose === 'reset' ? 'reset' : 'setup';
+
+    if (!email || !code) {
+      res.status(400).json({ error: '請提供 Email、驗證碼' });
+      return;
+    }
+    const roster = resolveLoginRoster(email);
+    if (!roster) {
+      res.status(403).json({ error: '此帳號不允許登入' });
+      return;
+    }
+
+    // 新流程：若沒有密碼，改走暱稱設定
+    if (!password) {
+      if (!nickname && needsNicknameSetup(email)) {
+        res.status(400).json({ error: '請填寫暱稱' });
+        return;
+      }
+      let checked = verifyLoginCode(email, code, purpose === 'reset' ? 'login' : purpose);
+      if (!checked.ok) checked = verifyLoginCode(email, code, 'login');
+      if (!checked.ok) {
+        res.status(400).json({ error: checked.error });
+        return;
+      }
+      ensureUserFromRoster(roster);
+      const user = completeOtpLogin(email, { nickname });
+      await maybeProvisionTeacher(user);
+      await issueSession(res, user);
+      res.json({ ok: true, user, message: '已登入' });
+      return;
+    }
+
+    if (password.length < 8) {
+      res.status(400).json({ error: '密碼至少 8 碼' });
+      return;
+    }
+    if (requiresNicknameOnSetup(roster.role, purpose) && needsNicknameSetup(email) && !nickname) {
+      res.status(400).json({ error: '首次設定請填寫暱稱（顯示名稱）' });
+      return;
+    }
+
+    const checked = verifyLoginCode(email, code, purpose === 'reset' ? 'login' : purpose);
+    if (!checked.ok) {
+      const alt = verifyLoginCode(email, code, 'login');
+      if (!alt.ok) {
+        res.status(400).json({ error: checked.error });
+        return;
+      }
+    }
+
+    ensureUserFromRoster(roster);
+    const user = await setPassword(email, password, { nickname });
+    await maybeProvisionTeacher(user);
+    await issueSession(res, user);
     res.json({
       ok: true,
       user: publicUser(user),
@@ -264,11 +474,11 @@ app.post('/api/auth/set-password', async (req, res) => {
     });
   } catch (err) {
     console.error('set-password:', err);
-    res.status(500).json({ error: '設定密碼失敗' });
+    res.status(500).json({ error: err.message || '設定密碼失敗' });
   }
 });
 
-/** 日常登入：Email + 密碼（不再每次驗證信箱） */
+/** 舊版密碼登入（相容；建議改驗證碼） */
 app.post('/api/auth/login', async (req, res) => {
   try {
     const email = normalizeEmail(req.body?.email);
@@ -277,28 +487,43 @@ app.post('/api/auth/login', async (req, res) => {
       res.status(400).json({ error: '請輸入 Email 與密碼' });
       return;
     }
-    if (!isPreApproved(email)) {
-      res.status(403).json({ error: '此帳號未在預核名單中' });
+    if (!resolveLoginRoster(email)) {
+      res.status(403).json({ error: '此帳號不允許登入' });
       return;
     }
-    if (!hasPassword(email)) {
+    if (!isAccountReady(email)) {
       res.status(400).json({
-        error: '尚未設定密碼。請改用「首次設定／忘記密碼」寄驗證碼。',
+        error: '尚未完成首次設定。請改用 Email 驗證碼登入。',
         needSetup: true,
       });
       return;
     }
     const user = await verifyPassword(email, password);
     if (!user) {
-      res.status(401).json({ error: 'Email 或密碼錯誤' });
+      res.status(401).json({ error: 'Email 或密碼錯誤。建議改用驗證碼登入。' });
       return;
     }
-    const token = await createSessionToken(user);
-    res.cookie(getSessionCookieName(), token, sessionCookieOptions());
+    await maybeProvisionTeacher(user);
+    await issueSession(res, user);
     res.json({ ok: true, user, message: '登入成功' });
   } catch (err) {
     console.error('login:', err);
     res.status(500).json({ error: '登入失敗' });
+  }
+});
+
+/** 登入後修改暱稱（teacherId／Drive 資料夾不變） */
+app.patch('/api/auth/nickname', requireAuth, async (req, res) => {
+  try {
+    const nickname = String(req.body?.nickname || '').trim();
+    const user = updateNickname(req.user.email, nickname);
+    if (user.teacherId) {
+      await syncTeacherNicknameToWiki(user.teacherId, user.nickname);
+    }
+    await issueSession(res, user);
+    res.json({ ok: true, user, message: '暱稱已更新' });
+  } catch (err) {
+    res.status(400).json({ error: err.message || '無法更新暱稱' });
   }
 });
 
@@ -317,7 +542,7 @@ app.post('/api/codex/stop', requireAuth, (req, res) => {
 });
 
 app.post('/api/codex/chat', requireAuth, async (req, res) => {
-  const { message, model, reasoningEffort, history } = req.body || {};
+  const { message, model, reasoningEffort, history, teacherId, subjectId } = req.body || {};
   if (!message?.trim()) {
     res.status(400).json({ error: '請輸入訊息' });
     return;
@@ -333,13 +558,15 @@ app.post('/api/codex/chat', requireAuth, async (req, res) => {
       history,
       model,
       reasoningEffort,
+      teacherId,
+      subjectId,
       sessionKey: req.user.email,
     });
     return;
   }
 
   try {
-    const result = await chatOnce({ message, history, model, reasoningEffort });
+    const result = await chatOnce({ message, history, model, reasoningEffort, teacherId, subjectId });
     res.json({ ok: true, ...result });
   } catch (err) {
     console.error('chat:', err);
@@ -350,12 +577,124 @@ app.post('/api/codex/chat', requireAuth, async (req, res) => {
   }
 });
 
+app.get('/api/wiki/subjects', requireTeacher, (req, res) => {
+  try {
+    const teacherId = resolveWriteTeacherId(req.user, req.query.teacherId);
+    if (!teacherId) {
+      res.status(403).json({ error: '此帳號未綁定 teacherId' });
+      return;
+    }
+    res.json({ ok: true, teacherId, subjects: listSubjectsForTeacher(teacherId) });
+  } catch (err) {
+    res.status(500).json({ error: err.message || '無法讀取科目列表' });
+  }
+});
+
+app.get('/api/wiki/list', requireTeacher, async (req, res) => {
+  try {
+    const result = await listTeacherFiles(req.user, {
+      subjectId: req.query.subjectId,
+      teacherId: req.query.teacherId,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || '無法讀取 wiki 列表' });
+  }
+});
+
+app.get('/api/wiki/list-all', requireTeacher, async (req, res) => {
+  try {
+    const result = await listAllTeacherFiles(req.user, {
+      teacherId: req.query.teacherId,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || '無法讀取 wiki 列表' });
+  }
+});
+
+app.get('/api/wiki/read', requireTeacher, async (req, res) => {
+  try {
+    const result = await readTeacherFile(req.user, {
+      subjectId: req.query.subjectId,
+      slug: req.query.slug,
+      teacherId: req.query.teacherId,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ error: err.message || '無法讀取筆記' });
+  }
+});
+
+app.post('/api/wiki/upload', requireTeacher, async (req, res) => {
+  try {
+    const { filename, content, subjectId, teacherId } = req.body || {};
+    const result = await uploadTeacherFile(req.user, { filename, content, subjectId, teacherId });
+    res.json(result);
+  } catch (err) {
+    console.error('wiki upload:', err);
+    res.status(400).json({ error: err.message || '儲存失敗' });
+  }
+});
+
+app.post('/api/wiki/rename', requireTeacher, async (req, res) => {
+  try {
+    const { oldSlug, newSlug, from, to, subjectId, teacherId } = req.body || {};
+    const result = await renameTeacherFile(req.user, {
+      subjectId,
+      teacherId,
+      oldSlug: oldSlug || from,
+      newSlug: newSlug || to,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('wiki rename:', err);
+    res.status(400).json({ error: err.message || '重新命名失敗' });
+  }
+});
+
+app.post('/api/wiki/delete', requireTeacher, async (req, res) => {
+  try {
+    const { subjectId, slug, teacherId } = req.body || {};
+    const result = await deleteTeacherFile(req.user, { subjectId, slug, teacherId });
+    res.json(result);
+  } catch (err) {
+    console.error('wiki delete:', err);
+    res.status(400).json({ error: err.message || '刪除失敗' });
+  }
+});
+
+app.post('/api/sync', requireTeacher, async (_req, res) => {
+  try {
+    const result = await runWikiSync();
+    res.json(result);
+  } catch (err) {
+    console.error('sync:', err);
+    res.status(500).json({ error: '同步失敗', detail: String(err.message || err) });
+  }
+});
+
 app.listen(PORT, HOST, () => {
+  const drive = getDriveStatus();
   console.log(`\n🔐 WikiNB KCIS API  http://127.0.0.1:${PORT}  (bind ${HOST})`);
-  console.log(`   Mode: host Auth + Codex（目前 Mac，可搬到 Windows）`);
+  console.log(`   Auth: Email OTP（@kcis.com.tw + 核准測試信箱）`);
   console.log(`   AUTH_BASE_URL: ${process.env.AUTH_BASE_URL || '(unset)'}`);
-  console.log(`   Auth: roster + email code + password`);
-  console.log(`   Roster: ${getRosterPath()}`);
-  console.log(`   LLM: ${process.env.LLM_PROVIDER || 'codex'}`);
+  console.log(`   Roster overrides: ${getRosterPath()}`);
+  console.log(`   LLM: ${process.env.LLM_PROVIDER || 'gemini'}`);
+  console.log(
+    drive.configured
+      ? `   Drive: 已設定 folder=${drive.folderId}`
+      : '   Drive: ⚠ 未設定服務帳號（筆記暫存本機 wiki/）',
+  );
+  const smtpOn = Boolean(
+    process.env.SMTP_USER?.trim() && String(process.env.SMTP_PASS || '').replace(/\s/g, ''),
+  );
+  console.log(
+    smtpOn
+      ? `   SMTP: ${process.env.SMTP_USER}（驗證碼寄信箱）`
+      : process.env.DEV_LOG_CODE === 'false'
+        ? '   SMTP: ⚠ 未設定完整，驗證碼無法寄信'
+        : '   SMTP: 未設定（DEV 模式：驗證碼印終端機）',
+  );
   console.log(`   Project: ${PROJECT_ROOT}\n`);
 });

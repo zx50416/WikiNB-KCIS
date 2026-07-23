@@ -7,9 +7,27 @@ dist/
 .env.*
 !.env.example
 !**/.env.example
+帳號密碼.md
+**/*帳號密碼*.md
 host/node_modules/
 host/.run/
 # 使用者密碼庫不進 git；預核名單可進（private repo）
 auth/data/users.json
 !auth/data/roster.example.json
 !auth/data/roster.json
+# Google 服務帳號等密鑰
+auth/secrets/**
+!auth/secrets/README.md
+!auth/secrets/.gitignore
+*.pem
+*-sa.json
+drive-sa.json
+
+# Google service account downloads
+auth/*.json
+!auth/package.json
+!auth/package-lock.json
+!auth/data/*.json
+
+# Cursor / local agent
+.cursor/

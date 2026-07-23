@@ -7,7 +7,7 @@
 - [x] 預核名單登入（Email → 驗證碼 → 設密碼 → 帳密）
 - [x] Codex 頁（對齊 WikiNB 文案／Markdown／Iansui）
 - [x] Public repo + GitHub Pages：https://zx50416.github.io/WikiNB-KCIS/
-- [x] 測試帳 `kainnne@kcis.com.tw`（roster admin）
+- [x] 測試帳 `chaos60649@gmail.com`（roster admin + SMTP 寄信）
 
 ## 進行中
 

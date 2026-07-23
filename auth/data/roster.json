@@ -1,19 +1,30 @@
 [
   {
-    "email": "kainnne@kcis.com.tw",
+    "email": "chaos60649@gmail.com",
     "name": "Kaine",
     "role": "admin",
-    "note": "測試用管理員 — 首次請走驗證碼設密碼（見 docs/SECURITY_AND_ONBOARDING.md）"
+    "teacherId": "kainnne",
+    "note": "測試管理員；筆記資料夾與 kainnne 共用；EXTRA_ALLOWED_EMAILS"
   },
   {
-    "email": "demo.teacher@example.com",
-    "name": "陳老師（示範）",
+    "email": "kainnne@kcis.com.tw",
+    "name": "Kaine（康橋）",
     "role": "teacher",
-    "teacherId": "demo-chen"
+    "teacherId": "kainnne",
+    "note": "明確標為老師；其餘學校網域預設學生"
   },
   {
-    "email": "demo.student@example.com",
-    "name": "示範學生",
-    "role": "student"
+    "email": "joewang@kcis.ntpc.edu.tw",
+    "name": "Joe Wang",
+    "role": "teacher",
+    "teacherId": "joewang",
+    "note": "NTPC 校域老師"
+  },
+  {
+    "email": "st101031616@gmail.com",
+    "name": "Test Student",
+    "role": "student",
+    "teacherId": "",
+    "note": "核准測試學生信箱；EXTRA_ALLOWED_EMAILS"
   }
 ]

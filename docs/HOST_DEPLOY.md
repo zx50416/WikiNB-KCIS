@@ -59,8 +59,9 @@ COOKIE_SAMESITE=none
 # AUTH_BASE_URL=https://xxxx.trycloudflare.com
 
 DEV_LOG_CODE=false
-SMTP_USER=kainnne@kcis.com.tw
-SMTP_PASS=你的應用程式密碼
+SMTP_USER=chaos60649@gmail.com
+SMTP_PASS=你的Gmail應用程式密碼（16碼）
+SMTP_FROM=WikiNB KCIS <chaos60649@gmail.com>
 # …
 LLM_PROVIDER=codex
 ```

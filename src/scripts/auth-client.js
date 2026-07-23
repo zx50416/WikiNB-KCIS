@@ -1,7 +1,8 @@
 /**
- * Auth + Codex API client
- * - 本機 dev：打 auth.url（http://127.0.0.1:8788）
- * - GitHub Pages：打 auth.productionUrl（主機 HTTPS Tunnel → Mac／未來 Windows 的 Auth+Codex）
+ * Auth API client
+ * - 本機 dev（127.0.0.1）：打 auth.url → http://127.0.0.1:8790
+ * - GitHub Pages：若有 auth.productionUrl（未來 Cloud Run）則用之；否則提示改走本機登入
+ * 過渡期不依賴 Mac＋Cloudflare Tunnel 主機腳本。
  */
 function readAuthConfig() {
   const el = document.getElementById('auth-config');
@@ -20,7 +21,7 @@ function getAuthBase() {
   const local = (
     cfg.url ||
     import.meta.env.PUBLIC_AUTH_URL ||
-    'http://127.0.0.1:8788'
+    'http://127.0.0.1:8790'
   ).replace(/\/$/, '');
   const production = String(
     cfg.productionUrl || import.meta.env.PUBLIC_AUTH_PRODUCTION_URL || '',
@@ -28,12 +29,11 @@ function getAuthBase() {
 
   if (typeof location !== 'undefined') {
     const onPages = location.hostname.endsWith('github.io');
-    // 線上 Pages：連部署主機（Mac／未來 Windows）的 HTTPS Auth+Codex
     if (onPages) {
+      // 只有填了雲端／HTTPS 後端才走 production；否則不要撞舊 Tunnel
       if (production) return production;
-      return local; // 尚未設定 productionUrl 時會觸發 mixed-content 提示
+      return local;
     }
-    // 本機開發網站
     if (location.hostname === '127.0.0.1' || location.hostname === 'localhost') {
       return local;
     }
@@ -60,7 +60,7 @@ async function authFetch(path, options = {}) {
     let message = data.error || data.message;
     if (!message) {
       if (res.status === 404) {
-        message = 'Auth API 找不到此功能，請重新啟動主機上的 npm run auth';
+        message = 'Auth API 找不到此功能，請重新啟動本機 npm run auth';
       } else {
         message = `連線失敗（HTTP ${res.status}）`;
       }
@@ -80,25 +80,26 @@ export function getAuthMixedContentBlock() {
   const authIsHttp = /^http:\/\//i.test(base);
   if (!(pageIsHttps && authIsHttp)) return null;
 
-  const cfg = readAuthConfig();
-  const hasProd = Boolean(String(cfg.productionUrl || '').trim());
   return {
     online: false,
-    reason: hasProd ? 'bad-production-url' : 'need-tunnel',
-    message: hasProd
-      ? '主機 Auth 位址仍是 HTTP，線上站無法連線。'
-      : '線上站尚未設定 HTTPS Tunnel（productionUrl）。',
+    reason: 'need-cloud-backend',
+    message:
+      '線上 GitHub Pages 無法直連本機 Auth。過渡期請改用本機登入頁；未來填上 Cloud Run 的 productionUrl 即可線上登入。',
   };
 }
 
-/** 專案在本機的預設路徑（交接／一鍵指令用） */
+export const REFRESH_AFTER_HOST_HINT =
+  'Auth 啟動後，請強制重新整理本頁（Mac：Cmd+Shift+R）。';
+
+export const CODE_SENT_HINT =
+  '驗證碼已寄至你的 Email 信箱，請查收（若沒看到請看垃圾郵件）。10 分鐘內有效。';
+
 export const HOST_PROJECT_DIR = '/Users/kaine/Desktop/Projects/WikiNB_for_KCIS';
 
 function hostCommands() {
   const q = `"${HOST_PROJECT_DIR}"`;
   return {
-    one: `cd ${q} && chmod +x host/one-command-mac.sh host/stop-mac.sh && ./host/one-command-mac.sh`,
-    stop: `cd ${q} && ./host/stop-mac.sh`,
+    localLogin: 'http://127.0.0.1:4322/WikiNB-KCIS/login',
     auth: `cd ${q} && npm run auth`,
     dev: `cd ${q} && npm run dev`,
   };
@@ -108,22 +109,22 @@ function hostCommands() {
  * 依目前網頁環境＋ Auth 健康狀態，回傳該顯示的說明與可複製終端機指令
  */
 export async function diagnoseAuthConnection() {
-  const cfg = readAuthConfig();
-  const production = String(cfg.productionUrl || '').trim().replace(/\/$/, '');
   const onPages = typeof location !== 'undefined' && location.hostname.endsWith('github.io');
   const onLocal =
     typeof location !== 'undefined' &&
     (location.hostname === '127.0.0.1' || location.hostname === 'localhost');
   const cmds = hostCommands();
+  const production = String(readAuthConfig().productionUrl || '').trim();
 
   const blocked = getAuthMixedContentBlock();
   if (blocked) {
     return {
       ...blocked,
-      title: '線上登入：請先在 Mac 開主機',
-      hint: '在「終端機」貼上下方指令（按複製）。跑完後約 1 分鐘再重新整理本頁。',
+      title: '線上站尚無雲端後端',
+      hint: '請改用本機開發登入（下方指令）。筆記已改存 Google Drive，但登入 API 仍須本機先跑起來。',
       commands: [
-        { id: 'one', label: '一鍵啟動（Auth＋Tunnel＋寫入網址＋push）', cmd: cmds.one },
+        { id: 'auth', label: '終端機 1：啟動 Auth（後端）', cmd: cmds.auth },
+        { id: 'dev', label: '終端機 2：啟動網站', cmd: cmds.dev },
       ],
     };
   }
@@ -143,15 +144,15 @@ export async function diagnoseAuthConnection() {
     if (onPages) {
       return {
         online: false,
-        reason: production ? 'host-offline' : 'need-tunnel',
-        title: production ? '主機 Auth／Tunnel 目前離線' : '尚未設定主機 Tunnel',
+        reason: production ? 'cloud-offline' : 'need-local-dev',
+        title: production ? '雲端 Auth 目前離線' : '請改用本機登入頁',
         message: production
-          ? '已設定 productionUrl，但連不到主機。請在 Mac 終端機重新啟動。'
-          : '線上站需要主機 HTTPS Tunnel。',
-        hint: '請開「新的」終端機視窗貼上（不要貼在還在跑的舊視窗）。',
+          ? 'productionUrl 連不上。請確認 Cloud Run／後端已啟動，或暫時改用本機登入。'
+          : 'GitHub Pages 只有畫面。過渡期請在本機啟動 Auth＋網站後，用本機登入頁（不要再開舊的 Tunnel 主機）。',
+        hint: REFRESH_AFTER_HOST_HINT,
         commands: [
-          { id: 'one', label: '重新一鍵啟動主機', cmd: cmds.one },
-          { id: 'stop', label: '（可選）先停止舊程序', cmd: cmds.stop },
+          { id: 'auth', label: '終端機 1：啟動 Auth', cmd: cmds.auth },
+          { id: 'dev', label: '終端機 2：啟動網站', cmd: cmds.dev },
         ],
         authBase: getAuthBase(),
       };
@@ -162,8 +163,8 @@ export async function diagnoseAuthConnection() {
         online: false,
         reason: 'local-auth-offline',
         title: '本機 Auth 未連線',
-        message: '本機開發請開兩個終端機：一個 Auth、一個網站。',
-        hint: '各複製一段到「不同」終端機視窗貼上。',
+        message: '請先在終端機執行 npm run auth（埠 8790），再重新整理本頁。',
+        hint: '建議開兩個終端機：一個 Auth、一個 npm run dev。',
         commands: [
           { id: 'auth', label: '終端機 1：啟動 Auth', cmd: cmds.auth },
           { id: 'dev', label: '終端機 2：啟動網站（若還沒開）', cmd: cmds.dev },
@@ -176,9 +177,9 @@ export async function diagnoseAuthConnection() {
       online: false,
       reason: 'offline',
       title: 'Auth 未連線',
-      message: '請在部署主機終端機執行一鍵腳本。',
+      message: '請啟動本機 Auth：npm run auth',
       hint: '',
-      commands: [{ id: 'one', label: '一鍵啟動主機', cmd: cmds.one }],
+      commands: [{ id: 'auth', label: '啟動 Auth', cmd: cmds.auth }],
     };
   }
 }
@@ -212,24 +213,72 @@ export async function lookupEmail(email) {
   });
 }
 
-export async function sendAuthCode(email, purpose = 'setup') {
+export async function sendAuthCode(email, purpose = 'login') {
   return authFetch('/api/auth/send-code', {
     method: 'POST',
     body: JSON.stringify({ email, purpose }),
   });
 }
 
-export async function verifyAuthCode(email, code, purpose = 'setup') {
+export async function verifyAuthCode(email, code, purpose = 'login') {
   return authFetch('/api/auth/verify-code', {
     method: 'POST',
     body: JSON.stringify({ email, code, purpose }),
   });
 }
 
-export async function setPasswordWithCode({ email, code, password, purpose = 'setup' }) {
+const SETUP_SESSION_KEY = 'wikinb_kcis_setup';
+const SETUP_SESSION_TTL_MS = 15 * 60 * 1000;
+
+/** 驗證碼通過後暫存，供 /login/setup 使用（不放在網址） */
+export function saveSetupSession(payload) {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.setItem(
+    SETUP_SESSION_KEY,
+    JSON.stringify({ ...payload, ts: Date.now() }),
+  );
+}
+
+export function readSetupSession(maxAgeMs = SETUP_SESSION_TTL_MS) {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(SETUP_SESSION_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.email || !data?.code) return null;
+    if (Date.now() - Number(data.ts || 0) > maxAgeMs) {
+      sessionStorage.removeItem(SETUP_SESSION_KEY);
+      return null;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export function clearSetupSession() {
+  if (typeof sessionStorage === 'undefined') return;
+  sessionStorage.removeItem(SETUP_SESSION_KEY);
+}
+
+export async function setPasswordWithCode({ email, code, password, nickname, purpose = 'setup' }) {
   return authFetch('/api/auth/set-password', {
     method: 'POST',
-    body: JSON.stringify({ email, code, password, purpose }),
+    body: JSON.stringify({ email, code, password, nickname, purpose }),
+  });
+}
+
+export async function completeSetup({ email, code, nickname, purpose = 'login' }) {
+  return authFetch('/api/auth/complete-setup', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, nickname, purpose }),
+  });
+}
+
+export async function loginWithCode({ email, code, purpose = 'login' }) {
+  return authFetch('/api/auth/login-with-code', {
+    method: 'POST',
+    body: JSON.stringify({ email, code, purpose }),
   });
 }
 
@@ -237,6 +286,13 @@ export async function loginWithPassword(email, password) {
   return authFetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
+  });
+}
+
+export async function updateMyNickname(nickname) {
+  return authFetch('/api/auth/nickname', {
+    method: 'PATCH',
+    body: JSON.stringify({ nickname }),
   });
 }
 
@@ -270,6 +326,8 @@ export async function codexChatStream(message, onEvent = () => {}, options = {})
       model: options.model,
       reasoningEffort: options.reasoningEffort,
       history: options.history || [],
+      teacherId: options.teacherId,
+      subjectId: options.subjectId,
     }),
     signal: options.signal,
   });
@@ -322,6 +380,73 @@ export async function codexChatStream(message, onEvent = () => {}, options = {})
   return finalPayload;
 }
 
+export async function syncWiki() {
+  return authFetch('/api/sync', { method: 'POST', body: '{}' });
+}
+
+export async function uploadWikiNote({ filename, content, subjectId, teacherId }) {
+  return authFetch('/api/wiki/upload', {
+    method: 'POST',
+    body: JSON.stringify({ filename, content, subjectId, teacherId }),
+  });
+}
+
+export async function listWikiFiles({ subjectId, teacherId } = {}) {
+  const qs = new URLSearchParams();
+  if (subjectId) qs.set('subjectId', subjectId);
+  if (teacherId) qs.set('teacherId', teacherId);
+  const q = qs.toString();
+  return authFetch(`/api/wiki/list${q ? `?${q}` : ''}`);
+}
+
+/** 一次列出該老師全部科目筆記 */
+export async function listAllWikiFiles({ teacherId } = {}) {
+  const qs = teacherId ? `?teacherId=${encodeURIComponent(teacherId)}` : '';
+  return authFetch(`/api/wiki/list-all${qs}`);
+}
+
+export async function readWikiFile({ subjectId, slug, teacherId }) {
+  const qs = new URLSearchParams();
+  if (subjectId) qs.set('subjectId', subjectId);
+  if (slug) qs.set('slug', slug);
+  if (teacherId) qs.set('teacherId', teacherId);
+  return authFetch(`/api/wiki/read?${qs.toString()}`);
+}
+
+export async function renameWikiFile({ oldSlug, newSlug, subjectId, teacherId }) {
+  return authFetch('/api/wiki/rename', {
+    method: 'POST',
+    body: JSON.stringify({ oldSlug, newSlug, subjectId, teacherId }),
+  });
+}
+
+export async function deleteWikiNote({ subjectId, slug, teacherId }) {
+  return authFetch('/api/wiki/delete', {
+    method: 'POST',
+    body: JSON.stringify({ subjectId, slug, teacherId }),
+  });
+}
+
+export async function fetchWikiSubjects({ teacherId } = {}) {
+  const qs = teacherId ? `?teacherId=${encodeURIComponent(teacherId)}` : '';
+  return authFetch(`/api/wiki/subjects${qs}`);
+}
+
+export function isTeacherUser(user) {
+  if (!user) return false;
+  return (user.role === 'teacher' || user.role === 'admin') && Boolean(user.teacherId);
+}
+
+export function displayUserName(user) {
+  if (!user) return '';
+  return user.nickname || user.name || user.email || '';
+}
+
+export function helloLabel(user) {
+  const name = displayUserName(user);
+  return name ? `Hello! ${name}` : '';
+}
+
 export async function isLoggedIn() {
   const me = await fetchMe();
   return Boolean(me.authenticated && me.user);
@@ -331,7 +456,20 @@ export async function mountNavAuth() {
   const loginLink = document.getElementById('nav-login');
   const logoutBtn = document.getElementById('nav-logout');
   const userLabel = document.getElementById('nav-user');
-  const codexLink = document.getElementById('nav-codex');
+  const userWrap = document.getElementById('nav-user-wrap');
+  const userMenu = document.getElementById('nav-user-menu');
+  const navAi = document.getElementById('nav-ai');
+  const navAddNote = document.getElementById('nav-add-note');
+
+  const closeMenu = () => {
+    userMenu?.classList.add('hidden');
+    userLabel?.setAttribute('aria-expanded', 'false');
+  };
+
+  const openMenu = () => {
+    userMenu?.classList.remove('hidden');
+    userLabel?.setAttribute('aria-expanded', 'true');
+  };
 
   const update = async () => {
     let me = { authenticated: false };
@@ -341,29 +479,58 @@ export async function mountNavAuth() {
       me = { authenticated: false };
     }
     const loggedIn = Boolean(me.authenticated && me.user);
+    const teacher = loggedIn && isTeacherUser(me.user);
     loginLink?.classList.toggle('hidden', loggedIn);
-    logoutBtn?.classList.toggle('hidden', !loggedIn);
-    codexLink?.classList.toggle('hidden', !loggedIn);
-    if (userLabel) {
+    navAi?.classList.toggle('hidden', teacher);
+    // 新增筆記：僅老師可見（CSS 預設 display:none，靠 is-teacher-visible 顯示）
+    if (navAddNote) {
+      navAddNote.classList.toggle('is-teacher-visible', teacher);
+      navAddNote.toggleAttribute('hidden', !teacher);
+      navAddNote.setAttribute('aria-hidden', teacher ? 'false' : 'true');
+      if (teacher) navAddNote.removeAttribute('tabindex');
+      else navAddNote.setAttribute('tabindex', '-1');
+    }
+    if (userWrap && userLabel) {
       if (loggedIn) {
-        userLabel.textContent = me.user.name || me.user.email;
-        userLabel.classList.remove('hidden');
+        userLabel.textContent = helloLabel(me.user);
+        userLabel.title = 'Account menu';
+        userWrap.classList.remove('hidden');
       } else {
-        userLabel.classList.add('hidden');
+        userWrap.classList.add('hidden');
+        closeMenu();
       }
     }
     document.dispatchEvent(
-      new CustomEvent('wikinb:auth-change', { detail: { loggedIn, user: me.user || null } }),
+      new CustomEvent('wikinb:auth-change', {
+        detail: { loggedIn, user: me.user || null, isTeacher: teacher },
+      }),
     );
   };
 
+  userLabel?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!userMenu) return;
+    if (userMenu.classList.contains('hidden')) openMenu();
+    else closeMenu();
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!userWrap?.contains(e.target)) closeMenu();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMenu();
+  });
+
   logoutBtn?.addEventListener('click', async (e) => {
     e.preventDefault();
+    closeMenu();
     await logout();
     await update();
-    window.location.href = document.documentElement.dataset.base || '/';
+    const base = document.documentElement.dataset.base || '/';
+    window.location.href = `${base}login?logged_out=1`;
   });
 
   await update();
-  return { update };
 }

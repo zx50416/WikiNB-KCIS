@@ -1,11 +1,13 @@
 /**
- * 預核名單（roster）— 只有名單內帳號可收驗證碼／設密碼／登入
- * 正式環境可由 Google Workspace 或 CSV 同步；測試用 JSON。
+ * 角色覆寫名單（roster）
+ * - 登入資格改由 domain.js（網域／例外信箱）決定
+ * - roster 用來標註 teacher／admin，或把誤標學生改回老師
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeEmail } from './domain.js';
+import { isAllowedLoginEmail, normalizeEmail } from './domain.js';
+import { effectiveRosterEntry } from './account.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const DATA_DIR = path.join(__dirname, '..', 'data');
@@ -39,8 +41,19 @@ export function findRosterEntry(email) {
   );
 }
 
+/** @deprecated 改用 isAllowedToLogin；保留相容 */
 export function isPreApproved(email) {
-  return Boolean(findRosterEntry(email));
+  return isAllowedToLogin(email);
+}
+
+export function isAllowedToLogin(email) {
+  return isAllowedLoginEmail(email);
+}
+
+/** 取得可登入者的有效開通資料（含無名單的學校信箱） */
+export function resolveLoginRoster(email) {
+  if (!isAllowedToLogin(email)) return null;
+  return effectiveRosterEntry(findRosterEntry(email), email);
 }
 
 export function getRosterPath() {

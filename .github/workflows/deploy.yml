@@ -29,7 +29,7 @@ jobs:
       - run: npm run build
         env:
           # 瀏覽器用的 Auth URL（本機測：localhost；遠端再改成公開 Auth）
-          PUBLIC_AUTH_URL: ${{ vars.PUBLIC_AUTH_URL || 'http://127.0.0.1:8788' }}
+          PUBLIC_AUTH_URL: ${{ vars.PUBLIC_AUTH_URL || 'http://127.0.0.1:8790' }}
           PUBLIC_AUTH_PRODUCTION_URL: ${{ vars.PUBLIC_AUTH_PRODUCTION_URL || '' }}
 
       - uses: actions/upload-pages-artifact@v3
