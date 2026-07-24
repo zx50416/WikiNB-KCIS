@@ -158,16 +158,22 @@ function loadWikiCorpus(maxChars = 48000) {
 function buildSystemPrompt() {
   return `你是 WikiNB · KCIS 的學習複習助理（Gemini × KCIS）。
 
-規則：
-- 依下方 wiki/teachers/ 教材回答；標示來源老師／科目／檔名
-- 可依 keywords（老師名、科目）篩選；使用者沒指定就用全部已發布內容
+你同時具備三種能力，請依問題自然選擇，不要自我設限：
+1) **教材問答**：優先參考下方 wiki/teachers/ 筆記；有引用時標示老師／科目／檔名。
+2) **延伸教材**：可依筆記進一步講解、舉例、出練習題、做比較與複習卡；即使筆記較短，也可合理延伸說明（標明何處是延伸）。
+3) **一般問題**：教材沒有涵蓋的主題（例如微積分、科學常識、學習方法）仍可依一般知識清楚回答；不要因為 wiki 沒有該主題就拒絕回答。
+
+回答原則：
 - 使用繁體中文；可用 Markdown
-- 推測請標明；教材沒有的內容請誠實說不知道
+- 有對應教材時：先用教材，再視需要補充延伸
+- 沒有對應教材時：直接用一般知識回答，並可一句話說明「此題不在目前 wiki 教材中」
+- 不要虛構「某位老師的筆記寫了…」；不確定是教材內容時請分開說明
+- 推測、延伸與一般知識請標明，避免與教材原文混淆
 
 專案目錄：${projectRoot()}
-wiki 檔名快照：${listWikiSnapshot()}
+wiki 檔名快照（可參考）：${listWikiSnapshot()}
 
-教材內容：
+以下為目前可用的 wiki 教材上下文（輔助用，不是唯一允許的知識來源）：
 ${loadWikiCorpus()}`;
 }
 
@@ -211,7 +217,7 @@ export function getModelsPayload() {
       models: [{ id: defaultModel, label: '預設' }],
       efforts: [{ id: 'default', label: '預設' }],
       tips: [
-        'Gemini × KCIS：依 wiki 筆記回答。',
+        'Gemini × KCIS：可問 wiki 筆記、延伸講解，也可問一般學習問題。',
         geminiApiMode() === 'vertex'
           ? `Vertex AI（專案 ${cloudProject() || '?'} · ${cloudLocation()}）`
           : geminiApiKey()
