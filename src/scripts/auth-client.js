@@ -4,6 +4,7 @@
  * - GitHub Pages：若有 auth.productionUrl（未來 Cloud Run）則用之；否則提示改走本機登入
  * 過渡期不依賴 Mac＋Cloudflare Tunnel 主機腳本。
  */
+import { t } from './i18n.js';
 function readAuthConfig() {
   const el = document.getElementById('auth-config');
   if (el?.textContent) {
@@ -517,8 +518,25 @@ export async function mountNavAuth() {
     }
     const loggedIn = Boolean(me.authenticated && me.user);
     const teacher = loggedIn && isTeacherUser(me.user);
+    const student = loggedIn && !teacher;
     loginLink?.classList.toggle('hidden', loggedIn);
-    navAi?.classList.toggle('hidden', teacher);
+    if (navAi) {
+      // 老師：隱藏；訪客：AI應用導航；學生：geminixkcis → /codex
+      navAi.classList.toggle('hidden', teacher);
+      if (student) {
+        navAi.setAttribute('data-i18n', 'nav.geminixkcis');
+        navAi.href = navAi.dataset.studentHref || navAi.href;
+        navAi.removeAttribute('target');
+        navAi.removeAttribute('rel');
+        navAi.textContent = t('nav.geminixkcis');
+      } else if (!teacher) {
+        navAi.setAttribute('data-i18n', 'nav.ai');
+        navAi.href = navAi.dataset.guestHref || navAi.href;
+        navAi.target = '_blank';
+        navAi.rel = 'noopener noreferrer';
+        navAi.textContent = t('nav.ai');
+      }
+    }
     // 新增筆記：僅老師可見（CSS 預設 display:none，靠 is-teacher-visible 顯示）
     if (navAddNote) {
       navAddNote.classList.toggle('is-teacher-visible', teacher);
