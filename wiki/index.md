@@ -18,6 +18,10 @@
 - [[teachers/demo-lin/english/describing-people]] — Describing People
 - [[teachers/demo-lin/english/school-subjects]] — School Subjects Vocabulary
 
+## kaine · 數學
+
+- [[teachers/kainnne/math/fractions-with-image]] — 分數圖示範例（含圖片）
+
 ## kaine · 英文
 
 - [[teachers/kainnne/english/classroom-warmup]] — Classroom English warm-up

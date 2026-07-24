@@ -176,6 +176,29 @@ function safeFilename(name) {
   return base.endsWith('.md') ? base : `${base}.md`;
 }
 
+const IMAGE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg']);
+
+function safeImageFilename(name) {
+  const raw = path.basename(String(name || 'image.png'));
+  const ext = path.extname(raw).toLowerCase();
+  const stem = path
+    .basename(raw, ext)
+    .replace(/[^\w.\-()\u4e00-\u9fff]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 60);
+  const useExt = IMAGE_EXTS.has(ext) ? ext : '.png';
+  const base = stem || `image-${Date.now()}`;
+  return `${base}${useExt}`;
+}
+
+function publicAssetsDir(teacherId, subjectId) {
+  return path.join(projectRoot(), 'public', 'wiki', 'teachers', teacherId, subjectId, 'assets');
+}
+
+function wikiAssetsDir(teacherId, subjectId) {
+  return path.join(subjectDir(teacherId, subjectId), 'assets');
+}
+
 export function normalizeSlug(input) {
   const raw = String(input || '')
     .trim()
@@ -598,6 +621,59 @@ export async function uploadTeacherFile(user, { subjectId, filename, content, te
       storage === 'google-drive'
         ? `已儲存到你的 Wiki（Google Drive：${drivePath}）。`
         : `已儲存到本機 wiki/teachers/${teacherId}/${subjectMeta.id}/${safeName}。`,
+  };
+}
+
+/**
+ * 上傳教學圖片：寫入 wiki/.../assets（與筆記同目錄樹）+ public/wiki/.../assets（本機／Pages 靜態提供）
+ * body.dataBase64 可含 data URL 前綴
+ */
+export async function uploadTeacherImage(
+  user,
+  { subjectId, filename, dataBase64, teacherId: reqTeacherId } = {},
+) {
+  const teacherId = resolveWriteTeacherId(user, reqTeacherId);
+  if (!teacherId) throw new Error('無權限上傳圖片');
+  if (!subjectId) throw new Error('請選擇科目或處室');
+  if (!findSubjectInCatalog(subjectId)) throw new Error('請選擇有效的科目或處室');
+
+  const raw = String(dataBase64 || '');
+  const m = raw.match(/^data:([^;]+);base64,(.+)$/s);
+  const b64 = (m ? m[2] : raw).replace(/\s/g, '');
+  if (!b64) throw new Error('請提供圖片資料');
+
+  let buffer;
+  try {
+    buffer = Buffer.from(b64, 'base64');
+  } catch {
+    throw new Error('圖片資料無效');
+  }
+  if (!buffer.length) throw new Error('圖片是空的');
+  if (buffer.length > 6 * 1024 * 1024) throw new Error('圖片請小於 6MB');
+
+  const teacherMeta = getTeacherMeta(teacherId);
+  const displayName =
+    String(user.nickname || teacherMeta.displayName || teacherMeta.name || teacherId).trim();
+  const subjectMeta = ensureSubjectFolder(teacherId, subjectId, displayName);
+  const safeName = safeImageFilename(filename);
+  const wikiDir = wikiAssetsDir(teacherId, subjectMeta.id);
+  const pubDir = publicAssetsDir(teacherId, subjectMeta.id);
+  fs.mkdirSync(wikiDir, { recursive: true });
+  fs.mkdirSync(pubDir, { recursive: true });
+  fs.writeFileSync(path.join(wikiDir, safeName), buffer);
+  fs.writeFileSync(path.join(pubDir, safeName), buffer);
+
+  const relPath = `wiki/teachers/${teacherId}/${subjectMeta.id}/assets/${safeName}`;
+  return {
+    ok: true,
+    teacherId,
+    subjectId: subjectMeta.id,
+    filename: safeName,
+    path: relPath,
+    /** 相對站台 root（前端請加 BASE_URL） */
+    publicPath: relPath,
+    bytes: buffer.length,
+    message: `圖片已上傳：${safeName}`,
   };
 }
 

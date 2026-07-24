@@ -15,7 +15,7 @@
   "home.addNote": "+ 新增筆記",
   "home.myNotes": "我的筆記",
   "myNotes.subtitle": "查閱、編輯或刪除你資料夾裡的筆記",
-  "myNotes.empty": "還沒有筆記。請從右上角 + 新增筆記開始。",
+  "myNotes.empty": "還沒有筆記。請從首頁中間的 + 新增筆記開始。",
   "myNotes.loadingTitle": "正在載入你的筆記…",
   "myNotes.loadingHint": "若需與雲端同步，此步驟可能約 1 分鐘，請稍候。",
   "myNotes.loadingSlow": "仍在載入（雲端同步中），可能再等約 1 分鐘…",
@@ -55,6 +55,11 @@
   "editor.pickNote": "選擇要編輯的筆記",
   "editor.gate": "請以老師帳號登入後使用。",
   "editor.filenameHint": "可用各國文字、數字、_ - .，不可空白",
+  "editor.insertImage": "加入／匯入圖片",
+  "editor.imageNeedSubject": "請先選擇科目／處室，再加入圖片",
+  "editor.imageUploading": "正在上傳圖片…",
+  "editor.imageInserted": "圖片已插入筆記",
+  "editor.imageFailed": "圖片上傳失敗",
   "kuse.how": "如何讓 AI 生成 .md？",
   "kuse.help": "把草稿貼下方，複製提示詞，到 AI 工具請它產出美觀 Markdown，再上傳回來。",
   "kuse.notesLabel": "你的筆記（貼這裡）",
@@ -117,5 +122,11 @@
   "gemini.example2": "用簡單的話複習分數加法（根據 wiki 筆記）",
   "gemini.example3": "幫我出 3 題比例練習題，並附簡短解答",
   "gemini.example4": "把今天數學課重點整理成 5 張複習卡",
-  "gemini.tipsBar": "點範例可快速提問；回答執行中可按「停止」。"
+  "gemini.stopping": "停止中…",
+  "gemini.starting": "啟動中…",
+  "gemini.working": "處理中…",
+  "gemini.done": "完成 · {time}",
+  "gemini.stopped": "（已停止）",
+  "gemini.totalTime": "總執行時間：{sec}s",
+  "gemini.connectFail": "無法連線 Gemini"
 }

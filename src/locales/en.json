@@ -15,7 +15,7 @@
   "home.addNote": "+ Add note",
   "home.myNotes": "My notes",
   "myNotes.subtitle": "View, edit, or delete notes in your folder",
-  "myNotes.empty": "No notes yet. Add one from + Add note.",
+  "myNotes.empty": "No notes yet. Add one from + Add note on the home page.",
   "myNotes.loadingTitle": "Loading your notes…",
   "myNotes.loadingHint": "This can take up to about a minute when syncing with cloud storage. Please wait.",
   "myNotes.loadingSlow": "Still loading (cloud sync). This may take up to about 1 minute…",
@@ -55,6 +55,11 @@
   "editor.pickNote": "Choose a note to edit",
   "editor.gate": "Please sign in with a teacher account.",
   "editor.filenameHint": "Letters (any language), numbers, _ - . — no spaces",
+  "editor.insertImage": "Insert / import image",
+  "editor.imageNeedSubject": "Choose a subject / office before adding an image",
+  "editor.imageUploading": "Uploading image…",
+  "editor.imageInserted": "Image inserted into the note",
+  "editor.imageFailed": "Could not upload image",
   "kuse.how": "How to let AI generate .md?",
   "kuse.help": "Paste your rough notes, copy the prompt, open the AI tool, ask it for a clean Markdown file, then upload here.",
   "kuse.notesLabel": "Your notes (paste here)",
@@ -117,5 +122,11 @@
   "gemini.example2": "Explain fraction addition in simple words using the wiki notes",
   "gemini.example3": "Give me 3 practice questions about ratios with short answers",
   "gemini.example4": "Turn today's math key points into 5 review flashcards",
-  "gemini.tipsBar": "Tap an example to ask quickly; press Stop while a reply is running."
+  "gemini.stopping": "Stopping…",
+  "gemini.starting": "Starting…",
+  "gemini.working": "Working…",
+  "gemini.done": "Done · {time}",
+  "gemini.stopped": "(Stopped)",
+  "gemini.totalTime": "Total time: {sec}s",
+  "gemini.connectFail": "Could not connect to Gemini"
 }

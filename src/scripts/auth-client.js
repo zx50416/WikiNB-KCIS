@@ -429,6 +429,14 @@ export async function uploadWikiNote({ filename, content, subjectId, teacherId }
   });
 }
 
+/** 上傳教學圖片（base64），回傳 publicPath 供插入 Markdown */
+export async function uploadWikiImage({ filename, dataBase64, subjectId, teacherId }) {
+  return authFetch('/api/wiki/upload-image', {
+    method: 'POST',
+    body: JSON.stringify({ filename, dataBase64, subjectId, teacherId }),
+  });
+}
+
 export async function listWikiFiles({ subjectId, teacherId } = {}) {
   const qs = new URLSearchParams();
   if (subjectId) qs.set('subjectId', subjectId);
@@ -523,7 +531,7 @@ export async function mountNavAuth() {
     loginLink?.classList.toggle('hidden', loggedIn);
     // 訪客：AI應用導航；登入後（老師／學生）隱藏
     navAi?.classList.toggle('hidden', loggedIn);
-    // 彩色 CTA：老師 → + 新增筆記；學生 → Gemini × KCIS
+    // 彩色 CTA：老師 → My notes；學生 → Gemini × KCIS
     if (navRoleCta) {
       const showCta = teacher || student;
       navRoleCta.classList.toggle('is-cta-visible', showCta);
@@ -535,8 +543,8 @@ export async function mountNavAuth() {
       if (teacher) {
         navRoleCta.href = navRoleCta.dataset.teacherHref || navRoleCta.href;
         if (navRoleCtaLabel) {
-          navRoleCtaLabel.setAttribute('data-i18n', 'home.addNote');
-          navRoleCtaLabel.textContent = t('home.addNote');
+          navRoleCtaLabel.setAttribute('data-i18n', 'home.myNotes');
+          navRoleCtaLabel.textContent = t('home.myNotes');
         }
       } else if (student) {
         navRoleCta.href = navRoleCta.dataset.studentHref || navRoleCta.href;

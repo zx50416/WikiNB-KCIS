@@ -38,6 +38,7 @@ import {
   resolveWriteTeacherId,
   runWikiSync,
   uploadTeacherFile,
+  uploadTeacherImage,
   deleteTeacherFile,
   provisionTeacherWorkspace,
   syncTeacherNicknameToWiki,
@@ -54,7 +55,7 @@ const PROJECT_ROOT = process.env.PROJECT_ROOT || path.resolve(__dirname, '..');
 process.env.PROJECT_ROOT = PROJECT_ROOT;
 
 const app = express();
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '8mb' }));
 app.use(cookieParser());
 const allowedOrigins = [
   process.env.FRONTEND_ORIGIN || 'http://127.0.0.1:4322',
@@ -654,6 +655,22 @@ app.post('/api/wiki/upload', requireTeacher, async (req, res) => {
   } catch (err) {
     console.error('wiki upload:', err);
     res.status(400).json({ error: err.message || '儲存失敗' });
+  }
+});
+
+app.post('/api/wiki/upload-image', requireTeacher, async (req, res) => {
+  try {
+    const { filename, dataBase64, subjectId, teacherId } = req.body || {};
+    const result = await uploadTeacherImage(req.user, {
+      filename,
+      dataBase64,
+      subjectId,
+      teacherId,
+    });
+    res.json(result);
+  } catch (err) {
+    console.error('wiki upload-image:', err);
+    res.status(400).json({ error: err.message || '圖片上傳失敗' });
   }
 });
 

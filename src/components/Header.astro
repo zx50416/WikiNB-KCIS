@@ -43,18 +43,18 @@ const navUrl = sites.sites.navigator.url;
       >
         AI應用導航
       </a>
-      <!-- 老師：+ 新增筆記；學生：Gemini × KCIS（同一套彩色按鈕） -->
+      <!-- 老師：My notes；學生：Gemini × KCIS（同一套彩色按鈕） -->
       <a
         id="nav-role-cta"
-        href={`${base}notes`}
+        href={`${base}my-notes`}
         class="nav-addnote"
         hidden
         aria-hidden="true"
         tabindex="-1"
-        data-teacher-href={`${base}notes`}
+        data-teacher-href={`${base}my-notes`}
         data-student-href={`${base}codex`}
       >
-        <span class="nav-addnote-label" data-i18n="home.addNote">+ Add note</span>
+        <span class="nav-addnote-label" data-i18n="home.myNotes">My notes</span>
       </a>
       <button id="btn-lang" type="button" class="nav-lang" title="切換為繁體中文">中文</button>
       <div id="nav-user-wrap" class="relative hidden">

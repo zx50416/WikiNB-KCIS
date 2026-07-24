@@ -210,6 +210,11 @@
     @apply bg-transparent p-0;
   }
 
+  .wiki-content img {
+    @apply my-4 block h-auto max-w-full rounded-xl;
+    border: 1px solid var(--kc-line);
+  }
+
   .wiki-content table {
     @apply my-4 w-full overflow-hidden rounded-xl border;
     border-color: var(--kc-line);
