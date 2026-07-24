@@ -96,7 +96,12 @@ app.use((req, res, next) => {
 });
 
 async function readSession(req) {
-  return verifySessionToken(req.cookies?.[getSessionCookieName()]);
+  const header = String(req.headers.authorization || '');
+  const bearer = header.toLowerCase().startsWith('bearer ')
+    ? header.slice(7).trim()
+    : '';
+  const cookieTok = req.cookies?.[getSessionCookieName()];
+  return verifySessionToken(bearer || cookieTok);
 }
 
 async function requireAuth(req, res, next) {
@@ -123,9 +128,11 @@ async function requireTeacher(req, res, next) {
   next();
 }
 
+/** 設 cookie（本機同站）並回傳 token（Pages 跨站用 Bearer） */
 async function issueSession(res, user) {
   const token = await createSessionToken(user);
   res.cookie(getSessionCookieName(), token, sessionCookieOptions());
+  return token;
 }
 
 async function maybeProvisionTeacher(user) {
@@ -352,8 +359,8 @@ app.post('/api/auth/login-with-code', async (req, res) => {
     ensureUserFromRoster(roster);
     const user = completeOtpLogin(email);
     await maybeProvisionTeacher(user);
-    await issueSession(res, user);
-    res.json({ ok: true, user, message: '登入成功' });
+    const token = await issueSession(res, user);
+    res.json({ ok: true, user, token, message: '登入成功' });
   } catch (err) {
     console.error('login-with-code:', err);
     res.status(500).json({ error: err.message || '登入失敗' });
@@ -394,10 +401,11 @@ app.post('/api/auth/complete-setup', async (req, res) => {
     ensureUserFromRoster(roster);
     const user = completeOtpLogin(email, { nickname });
     await maybeProvisionTeacher(user);
-    await issueSession(res, user);
+    const token = await issueSession(res, user);
     res.json({
       ok: true,
       user,
+      token,
       message: '帳號設定完成並已登入',
     });
   } catch (err) {
@@ -440,8 +448,8 @@ app.post('/api/auth/set-password', async (req, res) => {
       ensureUserFromRoster(roster);
       const user = completeOtpLogin(email, { nickname });
       await maybeProvisionTeacher(user);
-      await issueSession(res, user);
-      res.json({ ok: true, user, message: '已登入' });
+      const token = await issueSession(res, user);
+      res.json({ ok: true, user, token, message: '已登入' });
       return;
     }
 
@@ -466,10 +474,11 @@ app.post('/api/auth/set-password', async (req, res) => {
     ensureUserFromRoster(roster);
     const user = await setPassword(email, password, { nickname });
     await maybeProvisionTeacher(user);
-    await issueSession(res, user);
+    const token = await issueSession(res, user);
     res.json({
       ok: true,
       user: publicUser(user),
+      token,
       message: purpose === 'reset' ? '密碼已重設並登入' : '密碼已設定並登入',
     });
   } catch (err) {
@@ -504,8 +513,8 @@ app.post('/api/auth/login', async (req, res) => {
       return;
     }
     await maybeProvisionTeacher(user);
-    await issueSession(res, user);
-    res.json({ ok: true, user, message: '登入成功' });
+    const token = await issueSession(res, user);
+    res.json({ ok: true, user, token, message: '登入成功' });
   } catch (err) {
     console.error('login:', err);
     res.status(500).json({ error: '登入失敗' });
@@ -520,8 +529,8 @@ app.patch('/api/auth/nickname', requireAuth, async (req, res) => {
     if (user.teacherId) {
       await syncTeacherNicknameToWiki(user.teacherId, user.nickname);
     }
-    await issueSession(res, user);
-    res.json({ ok: true, user, message: '暱稱已更新' });
+    const token = await issueSession(res, user);
+    res.json({ ok: true, user, token, message: '暱稱已更新' });
   } catch (err) {
     res.status(400).json({ error: err.message || '無法更新暱稱' });
   }

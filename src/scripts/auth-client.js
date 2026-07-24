@@ -46,14 +46,43 @@ export function getAuthUrl() {
   return getAuthBase();
 }
 
+const TOKEN_KEY = 'wikinb_kcis_token';
+
+function getStoredToken() {
+  try {
+    return localStorage.getItem(TOKEN_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+function setStoredToken(token) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** 登入回應若帶 token（Pages 跨站），存起來之後用 Bearer */
+function rememberSessionFrom(data) {
+  if (data?.token) setStoredToken(data.token);
+  return data;
+}
+
 async function authFetch(path, options = {}) {
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+  const tok = getStoredToken();
+  if (tok) headers.Authorization = `Bearer ${tok}`;
+
   const res = await fetch(`${getAuthBase()}${path}`, {
     credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
     ...options,
+    headers,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -262,38 +291,43 @@ export function clearSetupSession() {
 }
 
 export async function setPasswordWithCode({ email, code, password, nickname, purpose = 'setup' }) {
-  return authFetch('/api/auth/set-password', {
+  const data = await authFetch('/api/auth/set-password', {
     method: 'POST',
     body: JSON.stringify({ email, code, password, nickname, purpose }),
   });
+  return rememberSessionFrom(data);
 }
 
 export async function completeSetup({ email, code, nickname, purpose = 'login' }) {
-  return authFetch('/api/auth/complete-setup', {
+  const data = await authFetch('/api/auth/complete-setup', {
     method: 'POST',
     body: JSON.stringify({ email, code, nickname, purpose }),
   });
+  return rememberSessionFrom(data);
 }
 
 export async function loginWithCode({ email, code, purpose = 'login' }) {
-  return authFetch('/api/auth/login-with-code', {
+  const data = await authFetch('/api/auth/login-with-code', {
     method: 'POST',
     body: JSON.stringify({ email, code, purpose }),
   });
+  return rememberSessionFrom(data);
 }
 
 export async function loginWithPassword(email, password) {
-  return authFetch('/api/auth/login', {
+  const data = await authFetch('/api/auth/login', {
     method: 'POST',
     body: JSON.stringify({ email, password }),
   });
+  return rememberSessionFrom(data);
 }
 
 export async function updateMyNickname(nickname) {
-  return authFetch('/api/auth/nickname', {
+  const data = await authFetch('/api/auth/nickname', {
     method: 'PATCH',
     body: JSON.stringify({ nickname }),
   });
+  return rememberSessionFrom(data);
 }
 
 export async function logout() {
@@ -302,6 +336,7 @@ export async function logout() {
   } catch {
     /* ignore */
   }
+  setStoredToken('');
 }
 
 export async function fetchCodexModels() {
@@ -317,6 +352,8 @@ export async function codexChatStream(message, onEvent = () => {}, options = {})
     'Content-Type': 'application/json',
     Accept: 'text/event-stream',
   };
+  const tok = getStoredToken();
+  if (tok) headers.Authorization = `Bearer ${tok}`;
   const res = await fetch(`${getAuthBase()}/api/codex/chat?stream=1`, {
     method: 'POST',
     credentials: 'include',
