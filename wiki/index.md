@@ -1,6 +1,6 @@
 # 康橋教學筆記庫索引
 
-> 最後更新：2026-07-23
+> 最後更新：2026-07-24
 
 ## 陳老師 · 數學
 
@@ -18,19 +18,14 @@
 - [[teachers/demo-lin/english/describing-people]] — Describing People
 - [[teachers/demo-lin/english/school-subjects]] — School Subjects Vocabulary
 
-## kaine · 數學
-
-
-## kaine · 英文
+## 朱璽 · 英文
 
 - [[teachers/kainnne/english/classroom-warmup]] — Classroom English warm-up
 
-## kaine · 資訊處
+## 朱璽 · 資訊處
 
 - [[teachers/kainnne/it/account-folder-guide]] — 帳號與雲端資料夾說明
-
-## kaine · 一般筆記
-
+- [[teachers/kainnne/it/test]] — test
 
 ## 說明
 

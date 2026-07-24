@@ -853,14 +853,162 @@ export async function provisionTeacherWorkspace({
 }
 
 export async function syncTeacherNicknameToWiki(teacherId, displayName) {
-  if (!teacherId || !displayName) return;
-  const metaPath = path.join(teacherDir(teacherId), '_meta.json');
+  if (!teacherId || !displayName) return { ok: false, reason: 'missing' };
+  const nick = String(displayName).trim();
+  if (!nick) return { ok: false, reason: 'empty nickname' };
+
+  const dir = teacherDir(teacherId);
+  fs.mkdirSync(dir, { recursive: true });
+  const metaPath = path.join(dir, '_meta.json');
   const meta = readJson(metaPath) || { id: teacherId, subjects: ['general'], status: 'active' };
-  meta.name = displayName;
-  meta.displayName = displayName;
-  fs.mkdirSync(teacherDir(teacherId), { recursive: true });
-  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf8');
-  if (isDriveConfigured()) {
-    await updateTeacherDisplayNameOnDrive(teacherId, displayName);
+  const previousNames = new Set(
+    [meta.displayName, meta.name, teacherId]
+      .map((s) => String(s || '').trim())
+      .filter((s) => s && s !== nick),
+  );
+
+  // 先掃筆記 frontmatter，把仍殘留的舊暱稱一併列入替換
+  if (fs.existsSync(dir)) {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!ent.isDirectory()) continue;
+      const subjectPath = path.join(dir, ent.name);
+      for (const name of fs.readdirSync(subjectPath)) {
+        if (!name.endsWith('.md')) continue;
+        const raw = fs.readFileSync(path.join(subjectPath, name), 'utf8');
+        const m = raw.match(/^teacher:\s*["']?([^\n"']+)["']?\s*$/m);
+        const old = String(m?.[1] || '').trim();
+        if (old && old !== nick) previousNames.add(old);
+      }
+      const sub = readJson(path.join(subjectPath, '_meta.json'));
+      if (Array.isArray(sub?.keywords)) {
+        for (const k of sub.keywords) {
+          const val = String(k || '').trim();
+          if (val && val !== nick && val === teacherId) previousNames.add(val);
+        }
+      }
+    }
   }
+
+  meta.id = teacherId;
+  meta.name = nick;
+  meta.displayName = nick;
+  meta.status = meta.status || 'active';
+  if (!Array.isArray(meta.subjects)) meta.subjects = ['general'];
+  fs.writeFileSync(metaPath, JSON.stringify(meta, null, 2), 'utf8');
+
+  const replaceNameList = (list) => {
+    const arr = Array.isArray(list) ? list.map((x) => String(x || '').trim()).filter(Boolean) : [];
+    const next = arr.map((k) => (previousNames.has(k) ? nick : k));
+    if (!next.includes(nick)) next.push(nick);
+    return [...new Set(next)];
+  };
+
+  const rewriteNoteFrontmatter = (raw) => {
+    if (!raw.startsWith('---')) return { text: raw, changed: false };
+    const end = raw.indexOf('\n---', 3);
+    if (end < 0) return { text: raw, changed: false };
+    let fm = raw.slice(0, end + 4);
+    const body = raw.slice(end + 4);
+    let changed = false;
+
+    const teacherRe = /^(teacher:\s*)(["']?)([^\n"']+)\2\s*$/m;
+    const tm = fm.match(teacherRe);
+    if (tm) {
+      const old = String(tm[3] || '').trim();
+      if (old !== nick && (previousNames.has(old) || !old)) {
+        fm = fm.replace(teacherRe, `$1"${nick}"`);
+        changed = true;
+        if (old) previousNames.add(old);
+      }
+    } else {
+      fm = fm.replace(/\n---\s*$/, `\nteacher: "${nick}"\n---`);
+      changed = true;
+    }
+
+    // keywords 清單內替換舊暱稱
+    const kwBlock = fm.match(/^keywords:\s*\n((?:\s+-\s+.+\n?)*)/m);
+    if (kwBlock) {
+      const lines = kwBlock[1]
+        .split('\n')
+        .map((line) => {
+          const m = line.match(/^(\s+-\s+)["']?([^"'\n]+)["']?\s*$/);
+          if (!m) return line;
+          const val = m[2].trim();
+          if (previousNames.has(val)) {
+            changed = true;
+            return `${m[1]}"${nick}"`;
+          }
+          return line;
+        })
+        .filter((line) => line.trim() !== '');
+      const hasNick = lines.some((line) => {
+        const m = line.match(/^\s+-\s+["']?([^"'\n]+)["']?\s*$/);
+        return m && m[1].trim() === nick;
+      });
+      if (!hasNick) {
+        lines.push(`  - "${nick}"`);
+        changed = true;
+      }
+      fm = fm.replace(/^keywords:\s*\n((?:\s+-\s+.+\n?)*)/m, `keywords:\n${lines.join('\n')}\n`);
+    }
+
+    return { text: changed ? fm + body : raw, changed };
+  };
+
+  let subjectsUpdated = 0;
+  let notesUpdated = 0;
+
+  if (fs.existsSync(dir)) {
+    for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!ent.isDirectory()) continue;
+      const subjectPath = path.join(dir, ent.name);
+      const subMetaPath = path.join(subjectPath, '_meta.json');
+      const sub = readJson(subMetaPath);
+      if (sub) {
+        const before = JSON.stringify(sub.keywords || []);
+        sub.teacherId = teacherId;
+        sub.keywords = replaceNameList(sub.keywords);
+        if (Array.isArray(sub.keywordsEn)) {
+          sub.keywordsEn = replaceNameList(sub.keywordsEn);
+        }
+        if (JSON.stringify(sub.keywords || []) !== before) subjectsUpdated += 1;
+        fs.writeFileSync(subMetaPath, JSON.stringify(sub, null, 2), 'utf8');
+      }
+
+      for (const name of fs.readdirSync(subjectPath)) {
+        if (!name.endsWith('.md')) continue;
+        const fp = path.join(subjectPath, name);
+        const raw = fs.readFileSync(fp, 'utf8');
+        const { text, changed } = rewriteNoteFrontmatter(raw);
+        if (changed) {
+          fs.writeFileSync(fp, text, 'utf8');
+          notesUpdated += 1;
+          if (isDriveConfigured()) {
+            try {
+              await upsertTeacherMarkdown(teacherId, ent.name, name, text);
+            } catch (err) {
+              console.warn('sync nickname drive note:', err.message || err);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (isDriveConfigured()) {
+    try {
+      await updateTeacherDisplayNameOnDrive(teacherId, nick);
+    } catch (err) {
+      console.warn('sync nickname drive meta:', err.message || err);
+    }
+  }
+
+  return {
+    ok: true,
+    teacherId,
+    displayName: nick,
+    subjectsUpdated,
+    notesUpdated,
+    replaced: [...previousNames],
+  };
 }

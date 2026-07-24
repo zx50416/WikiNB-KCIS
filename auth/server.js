@@ -401,6 +401,9 @@ app.post('/api/auth/complete-setup', async (req, res) => {
     ensureUserFromRoster(roster);
     const user = completeOtpLogin(email, { nickname });
     await maybeProvisionTeacher(user);
+    if (user.teacherId && user.nickname) {
+      await syncTeacherNicknameToWiki(user.teacherId, user.nickname);
+    }
     const token = await issueSession(res, user);
     res.json({
       ok: true,
