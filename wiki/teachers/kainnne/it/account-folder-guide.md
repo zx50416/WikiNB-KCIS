@@ -1,13 +1,13 @@
 ---
 title: "帳號與雲端資料夾說明"
 description: "資訊處備註：WikiNB 老師資料夾規則"
-teacher: "朱璽"
+teacher: "kaine"
 teacher_id: kainnne
 subject: "資訊處"
 subject_id: it
 keywords:
   - "資訊處"
-  - "朱璽"
+  - "kaine"
 status: published
 audience: students
 date: 2026-07-23

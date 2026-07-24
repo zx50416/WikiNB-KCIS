@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isTeacherRole, requiresNicknameOnSetup } from './lib/account.js';
+import { isTeacherRole, requiresNicknameOnSetup, slugifyTeacherId } from './lib/account.js';
 import { getDriveStatus } from './lib/drive.js';
 import { normalizeEmail, rejectReasonForEmail } from './lib/domain.js';
 import { chatOnce, chatStream, getModelsPayload, stopJob } from './lib/llm.js';
@@ -143,6 +143,18 @@ async function maybeProvisionTeacher(user) {
       name: user.name,
     });
   }
+}
+
+/** 只有「自己的老師資料夾」才用暱稱覆寫 wiki 顯示名（避免 admin 共用 teacherId 蓋掉老師暱稱） */
+function shouldSyncWikiNickname(user) {
+  if (!user?.teacherId || !user?.nickname) return false;
+  if (user.role === 'teacher') return true;
+  return slugifyTeacherId(user.email) === user.teacherId;
+}
+
+async function syncWikiNicknameIfOwner(user) {
+  if (!shouldSyncWikiNickname(user)) return null;
+  return syncTeacherNicknameToWiki(user.teacherId, user.nickname);
 }
 
 app.get('/api/health', (_req, res) => {
@@ -401,9 +413,7 @@ app.post('/api/auth/complete-setup', async (req, res) => {
     ensureUserFromRoster(roster);
     const user = completeOtpLogin(email, { nickname });
     await maybeProvisionTeacher(user);
-    if (user.teacherId && user.nickname) {
-      await syncTeacherNicknameToWiki(user.teacherId, user.nickname);
-    }
+    await syncWikiNicknameIfOwner(user);
     const token = await issueSession(res, user);
     res.json({
       ok: true,
@@ -529,9 +539,7 @@ app.patch('/api/auth/nickname', requireAuth, async (req, res) => {
   try {
     const nickname = String(req.body?.nickname || '').trim();
     const user = updateNickname(req.user.email, nickname);
-    if (user.teacherId) {
-      await syncTeacherNicknameToWiki(user.teacherId, user.nickname);
-    }
+    await syncWikiNicknameIfOwner(user);
     const token = await issueSession(res, user);
     res.json({ ok: true, user, token, message: '暱稱已更新' });
   } catch (err) {

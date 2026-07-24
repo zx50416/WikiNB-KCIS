@@ -1,13 +1,13 @@
 ---
 title: "Classroom English warm-up"
 description: "常用課堂英文短句"
-teacher: "朱璽"
+teacher: "kaine"
 teacher_id: kainnne
 subject: "英文"
 subject_id: english
 keywords:
   - "英文"
-  - "朱璽"
+  - "kaine"
 status: published
 audience: students
 date: 2026-07-23

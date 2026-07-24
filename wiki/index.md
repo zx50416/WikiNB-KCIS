@@ -18,11 +18,11 @@
 - [[teachers/demo-lin/english/describing-people]] — Describing People
 - [[teachers/demo-lin/english/school-subjects]] — School Subjects Vocabulary
 
-## 朱璽 · 英文
+## kaine · 英文
 
 - [[teachers/kainnne/english/classroom-warmup]] — Classroom English warm-up
 
-## 朱璽 · 資訊處
+## kaine · 資訊處
 
 - [[teachers/kainnne/it/account-folder-guide]] — 帳號與雲端資料夾說明
 - [[teachers/kainnne/it/test]] — test

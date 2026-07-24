@@ -1,12 +1,12 @@
 ---
 title: "test"
-teacher: "朱璽"
+teacher: "kaine"
 teacher_id: kainnne
 subject: "資訊處"
 subject_id: it
 keywords:
   - "資訊處"
-  - "朱璽"
+  - "kaine"
 status: published
 audience: students
 date: 2026-07-24
