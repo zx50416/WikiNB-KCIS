@@ -6,7 +6,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-PORT="${PORT:-8788}"
+PORT="${PORT:-8790}"
 LOG_DIR="$ROOT/host/.run"
 mkdir -p "$LOG_DIR"
 TUNNEL_LOG="$LOG_DIR/tunnel.log"
@@ -47,13 +47,14 @@ start_auth() {
   fi
   (
     cd "$ROOT"
-    export HOST=127.0.0.1
-    export FRONTEND_ORIGINS=https://zx50416.github.io
+    export HOST=0.0.0.0
+    export PORT="$PORT"
+    export FRONTEND_ORIGINS=https://zx50416.github.io,http://127.0.0.1:4322,http://localhost:4322
     export COOKIE_SAMESITE=none
     # AUTH_BASE_URL 由 .env 讀取（稍後會寫入 Tunnel 網址）
-    npm run auth
-  ) >"$AUTH_LOG" 2>&1 &
-  echo $! >"$LOG_DIR/auth.pid"
+    nohup npm run auth >>"$AUTH_LOG" 2>&1 &
+    echo $! >"$LOG_DIR/auth.pid"
+  )
   for i in {1..30}; do
     if auth_ok; then
       echo "✓ Auth 已在 http://127.0.0.1:${PORT}"
@@ -74,7 +75,7 @@ fi
 
 echo "→ 啟動 Cloudflare Tunnel（取得 HTTPS 網址）…"
 : >"$TUNNEL_LOG"
-cloudflared tunnel --url "http://127.0.0.1:${PORT}" >"$TUNNEL_LOG" 2>&1 &
+nohup cloudflared tunnel --url "http://127.0.0.1:${PORT}" >"$TUNNEL_LOG" 2>&1 &
 TUNNEL_PID=$!
 echo $TUNNEL_PID >"$LOG_DIR/tunnel.pid"
 
@@ -129,7 +130,11 @@ def upsert(text, key, value):
 
 text = upsert(text, "AUTH_BASE_URL", url)
 text = upsert(text, "COOKIE_SAMESITE", "none")
-text = upsert(text, "FRONTEND_ORIGINS", "https://zx50416.github.io")
+text = upsert(
+    text,
+    "FRONTEND_ORIGINS",
+    "https://zx50416.github.io,http://127.0.0.1:4322,http://localhost:4322",
+)
 path.write_text(text, encoding="utf-8")
 print("ok", path)
 PY
