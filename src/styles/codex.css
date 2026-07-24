@@ -67,16 +67,6 @@
     font-family: var(--codex-hand);
   }
 
-  .codex-page .codex-tips {
-    border-bottom: 1px solid rgba(27, 79, 156, 0.12);
-    background: rgba(234, 240, 251, 0.75);
-    padding: 0.65rem 0.75rem;
-    font-size: 0.8rem;
-    line-height: 1.5;
-    color: #1b4f9c;
-    text-align: center;
-  }
-
   .codex-page .codex-teacher-tools {
     display: flex;
     flex-wrap: wrap;
@@ -84,14 +74,6 @@
     border-bottom: 1px solid rgba(27, 79, 156, 0.12);
     background: rgba(255, 255, 255, 0.35);
     padding: 0.65rem 0.75rem;
-  }
-
-  @media (min-width: 640px) {
-    .codex-page .codex-tips {
-      padding: 0.75rem 1rem;
-      font-size: 0.875rem;
-      line-height: 1.625;
-    }
   }
 
   .codex-page .codex-drop {
