@@ -3,7 +3,6 @@
   "nav.homeTitle": "Back to main",
   "nav.wikinb": "WikiNB",
   "nav.ai": "AI App Navigator",
-  "nav.geminixkcis": "geminixkcis",
   "nav.login": "Log in",
   "nav.loginSoon": "Coming next",
   "nav.lang": "中文",
@@ -111,5 +110,12 @@
   "gemini.gate": "Please sign in to use Gemini.",
   "gemini.placeholder": "Ask about your wiki notes…",
   "gemini.send": "Send",
-  "gemini.stop": "Stop"
+  "gemini.stop": "Stop",
+  "gemini.connected": "Gemini × KCIS is connected.",
+  "gemini.examplesIntro": "Try asking like this (tap to fill):",
+  "gemini.example1": "What notes did Teacher Lin upload recently?",
+  "gemini.example2": "Explain fraction addition in simple words using the wiki notes",
+  "gemini.example3": "Give me 3 practice questions about ratios with short answers",
+  "gemini.example4": "Turn today's math key points into 5 review flashcards",
+  "gemini.tipsBar": "Tap an example to ask quickly; press Stop while a reply is running."
 }

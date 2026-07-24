@@ -40,18 +40,19 @@ const navUrl = sites.sites.navigator.url;
         target="_blank"
         rel="noopener noreferrer"
         data-i18n="nav.ai"
-        data-guest-href={navUrl}
-        data-student-href={`${base}codex`}
       >
         AI應用導航
       </a>
+      <!-- 老師：+ 新增筆記；學生：Gemini × KCIS（同一套彩色按鈕） -->
       <a
-        id="nav-add-note"
+        id="nav-role-cta"
         href={`${base}notes`}
         class="nav-addnote"
         hidden
         aria-hidden="true"
         tabindex="-1"
+        data-teacher-href={`${base}notes`}
+        data-student-href={`${base}codex`}
       >
         <span class="nav-addnote-label" data-i18n="home.addNote">+ Add note</span>
       </a>
@@ -162,7 +163,7 @@ const navUrl = sites.sites.navigator.url;
     transition: box-shadow 0.2s ease, opacity 0.2s ease;
   }
 
-  .nav-addnote.is-teacher-visible {
+  .nav-addnote.is-cta-visible {
     display: inline-flex;
   }
 

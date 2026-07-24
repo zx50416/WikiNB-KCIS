@@ -53,6 +53,7 @@ const base = import.meta.env.BASE_URL;
 
 <script>
   import { marked } from 'marked';
+  import { t } from '../scripts/i18n.js';
   import {
     checkAuthHealth,
     fetchMe,
@@ -79,6 +80,13 @@ const base = import.meta.env.BASE_URL;
   /** @type {{ role: string, content: string }[]} */
   let chatHistory = [];
 
+  const EXAMPLE_KEYS = [
+    'gemini.example1',
+    'gemini.example2',
+    'gemini.example3',
+    'gemini.example4',
+  ];
+
   function setBubbleText(bubble, text, role = 'assistant') {
     if (!bubble) return;
     if (role === 'assistant') {
@@ -100,6 +108,48 @@ const base = import.meta.env.BASE_URL;
     output?.appendChild(line);
     output?.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
     return line;
+  }
+
+  function fillExamplePrompt(text) {
+    if (!input || running) return;
+    input.value = text;
+    input.focus();
+    input.setSelectionRange(text.length, text.length);
+  }
+
+  function appendWelcomeWithExamples() {
+    const line = document.createElement('div');
+    line.className = 'codex-line codex-line-system';
+    const bubble = document.createElement('div');
+    bubble.className = 'codex-bubble codex-welcome';
+
+    const title = document.createElement('p');
+    title.className = 'codex-welcome-title';
+    title.textContent = t('gemini.connected');
+
+    const intro = document.createElement('p');
+    intro.className = 'codex-welcome-intro';
+    intro.textContent = t('gemini.examplesIntro');
+
+    const list = document.createElement('ul');
+    list.className = 'codex-example-list';
+    for (const key of EXAMPLE_KEYS) {
+      const prompt = t(key);
+      const item = document.createElement('li');
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'codex-example-btn';
+      btn.textContent = prompt;
+      btn.title = prompt;
+      btn.addEventListener('click', () => fillExamplePrompt(prompt));
+      item.appendChild(btn);
+      list.appendChild(item);
+    }
+
+    bubble.append(title, intro, list);
+    line.appendChild(bubble);
+    output?.appendChild(line);
+    output?.scrollTo({ top: output.scrollHeight, behavior: 'smooth' });
   }
 
   function startElapsedTimer() {
@@ -132,7 +182,7 @@ const base = import.meta.env.BASE_URL;
     if (sendBtn) sendBtn.disabled = isRunning;
     if (stopBtn) {
       stopBtn.disabled = !isRunning;
-      stopBtn.textContent = '停止';
+      stopBtn.textContent = t('gemini.stop');
     }
     input?.toggleAttribute('disabled', isRunning);
   }
@@ -141,11 +191,7 @@ const base = import.meta.env.BASE_URL;
     try {
       const data = await fetchCodexModels();
       fixedModel = data.defaultModel || data.models?.[0]?.id || fixedModel;
-      if (tipsEl) {
-        tipsEl.textContent =
-          (data.tips && data.tips[0]) ||
-          'Gemini × KCIS：可問「陳老師的數學」或「林老師的英文」。';
-      }
+      if (tipsEl) tipsEl.textContent = t('gemini.tipsBar');
       if (data.error) appendLine(data.error, 'error');
     } catch (err) {
       appendLine(err.message || '無法連線 Gemini', 'error');
@@ -169,7 +215,7 @@ const base = import.meta.env.BASE_URL;
     }
     terminal?.classList.remove('hidden');
     await loadModels();
-    appendLine('Gemini × KCIS 已連線。直接提問即可；執行中可按停止。', 'system');
+    appendWelcomeWithExamples();
     input?.focus();
   }
 

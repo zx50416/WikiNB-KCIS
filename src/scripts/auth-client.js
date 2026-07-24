@@ -497,7 +497,8 @@ export async function mountNavAuth() {
   const userWrap = document.getElementById('nav-user-wrap');
   const userMenu = document.getElementById('nav-user-menu');
   const navAi = document.getElementById('nav-ai');
-  const navAddNote = document.getElementById('nav-add-note');
+  const navRoleCta = document.getElementById('nav-role-cta');
+  const navRoleCtaLabel = navRoleCta?.querySelector('.nav-addnote-label');
 
   const closeMenu = () => {
     userMenu?.classList.add('hidden');
@@ -520,30 +521,30 @@ export async function mountNavAuth() {
     const teacher = loggedIn && isTeacherUser(me.user);
     const student = loggedIn && !teacher;
     loginLink?.classList.toggle('hidden', loggedIn);
-    if (navAi) {
-      // 老師：隱藏；訪客：AI應用導航；學生：geminixkcis → /codex
-      navAi.classList.toggle('hidden', teacher);
-      if (student) {
-        navAi.setAttribute('data-i18n', 'nav.geminixkcis');
-        navAi.href = navAi.dataset.studentHref || navAi.href;
-        navAi.removeAttribute('target');
-        navAi.removeAttribute('rel');
-        navAi.textContent = t('nav.geminixkcis');
-      } else if (!teacher) {
-        navAi.setAttribute('data-i18n', 'nav.ai');
-        navAi.href = navAi.dataset.guestHref || navAi.href;
-        navAi.target = '_blank';
-        navAi.rel = 'noopener noreferrer';
-        navAi.textContent = t('nav.ai');
+    // 訪客：AI應用導航；登入後（老師／學生）隱藏
+    navAi?.classList.toggle('hidden', loggedIn);
+    // 彩色 CTA：老師 → + 新增筆記；學生 → Gemini × KCIS
+    if (navRoleCta) {
+      const showCta = teacher || student;
+      navRoleCta.classList.toggle('is-cta-visible', showCta);
+      navRoleCta.toggleAttribute('hidden', !showCta);
+      navRoleCta.setAttribute('aria-hidden', showCta ? 'false' : 'true');
+      if (showCta) navRoleCta.removeAttribute('tabindex');
+      else navRoleCta.setAttribute('tabindex', '-1');
+
+      if (teacher) {
+        navRoleCta.href = navRoleCta.dataset.teacherHref || navRoleCta.href;
+        if (navRoleCtaLabel) {
+          navRoleCtaLabel.setAttribute('data-i18n', 'home.addNote');
+          navRoleCtaLabel.textContent = t('home.addNote');
+        }
+      } else if (student) {
+        navRoleCta.href = navRoleCta.dataset.studentHref || navRoleCta.href;
+        if (navRoleCtaLabel) {
+          navRoleCtaLabel.setAttribute('data-i18n', 'nav.gemini');
+          navRoleCtaLabel.textContent = t('nav.gemini');
+        }
       }
-    }
-    // 新增筆記：僅老師可見（CSS 預設 display:none，靠 is-teacher-visible 顯示）
-    if (navAddNote) {
-      navAddNote.classList.toggle('is-teacher-visible', teacher);
-      navAddNote.toggleAttribute('hidden', !teacher);
-      navAddNote.setAttribute('aria-hidden', teacher ? 'false' : 'true');
-      if (teacher) navAddNote.removeAttribute('tabindex');
-      else navAddNote.setAttribute('tabindex', '-1');
     }
     if (userWrap && userLabel) {
       if (loggedIn) {
